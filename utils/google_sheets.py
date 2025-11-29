@@ -5,7 +5,9 @@ from typing import Optional
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Spreadsheet and worksheet configuration
+# Spreadsheet configuration:
+# Insert your real spreadsheet ID:
+# https://docs.google.com/spreadsheets/d/<SPREADSHEET_ID>/edit
 SPREADSHEET_ID = "1GJCz5exxiVOM1hCwOSJ-O-lL35k1yOUfA4jo40wPdgY"
 WORKSHEET_NAME = "Posts"
 
@@ -13,14 +15,15 @@ WORKSHEET_NAME = "Posts"
 def _get_gspread_client():
     """
     Creates an authorized gspread client using a service account.
-    Expects a credentials.json file in the project root by default.
+    Expects a credentials.json file in the project root or a path
+    specified via GOOGLE_SHEETS_CREDENTIALS environment variable.
     """
     credentials_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "credentials.json")
 
     if not os.path.exists(credentials_path):
         raise FileNotFoundError(
             f"Google Sheets credentials file not found: {credentials_path}. "
-            f"Set GOOGLE_SHEETS_CREDENTIALS env var or place credentials.json in the project root."
+            f"Place credentials.json in the root or set GOOGLE_SHEETS_CREDENTIALS env var."
         )
 
     scopes = [
@@ -40,11 +43,13 @@ def append_post_row(
     draft: str,
     final_post: str,
     total_tokens: Optional[int],
+    cost: Optional[float],
 ):
     """
-    Appends a new row to the Google Sheet with the given data.
-    Columns:
-        Timestamp | Topic | Draft (Writer) | Final Post (Editor) | Total Tokens
+    Appends a new row to the Google Sheet.
+
+    Expected columns:
+        Timestamp | Topic | Draft (Writer) | Final Post (Editor) | Total Tokens | Cost
     """
     client = _get_gspread_client()
     spreadsheet = client.open_by_key(SPREADSHEET_ID)
@@ -58,6 +63,7 @@ def append_post_row(
         draft,
         final_post,
         total_tokens if total_tokens is not None else "",
+        cost if cost is not None else "",
     ]
 
     worksheet.append_row(row, value_input_option="RAW")
