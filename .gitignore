@@ -1,0 +1,28 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables
+.env
+
+# Google API credentials
+credentials.json
+*.pem
+
+# IDE settings
+.idea/
+
+# Logs
+*.log
+
+# macOS system files
+.DS_Store
+
+# Jupyter checkpoint files
+.ipynb_checkpoints/
+
+
