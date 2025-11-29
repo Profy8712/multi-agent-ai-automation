@@ -13,16 +13,16 @@ if not API_KEY:
 genai.configure(api_key=API_KEY)
 
 
-def generate_text(prompt: str, model_name: str = "gemini-1.5-flash"):
+def generate_text(prompt: str):
     """
     Wrapper for Gemini API.
 
     Returns:
-        text (str): Model's text output.
+        text (str): Generated text output.
         usage (dict): Token usage information.
-        response (object): Raw Gemini response.
+        response (object): Raw Gemini response object.
     """
-    model = genai.GenerativeModel(model_name)
+    model = genai.GenerativeModel("gemini-pro")
     response = model.generate_content(prompt)
 
     text = response.text or ""
