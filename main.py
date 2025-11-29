@@ -2,12 +2,13 @@ import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 from agents.writer_agent import generate_linkedin_draft
 from agents.editor_agent import edit_linkedin_post
 from utils.google_sheets import append_post_row, GoogleSheetsError
 from utils.gemini_client import GeminiAPIError
+
+# Load environment variables from .env
+load_dotenv()
 
 # Load token price for cost calculation
 TOKEN_PRICE = float(os.getenv("TOKEN_PRICE", 0.000002))
@@ -16,17 +17,26 @@ TOKEN_PRICE = float(os.getenv("TOKEN_PRICE", 0.000002))
 def _safe_total_tokens(writer_usage, editor_usage) -> int:
     """
     Safely sums total tokens from writer and editor usage dicts.
+    Supports both old and new Gemini usage formats.
     """
-    writer_tokens = 0
-    editor_tokens = 0
 
-    if isinstance(writer_usage, dict):
-        writer_tokens = writer_usage.get("total_tokens", 0) or 0
+    def _extract_total(usage: dict) -> int:
+        if not isinstance(usage, dict):
+            return 0
+        # New SDK: total_token_count
+        if usage.get("total_token_count") is not None:
+            return int(usage.get("total_token_count") or 0)
+        # Old naming: totalTokens / total_tokens
+        if usage.get("totalTokens") is not None:
+            return int(usage.get("totalTokens") or 0)
+        if usage.get("total_tokens") is not None:
+            return int(usage.get("total_tokens") or 0)
+        return 0
 
-    if isinstance(editor_usage, dict):
-        editor_tokens = editor_usage.get("total_tokens", 0) or 0
+    writer_tokens = _extract_total(writer_usage)
+    editor_tokens = _extract_total(editor_usage)
 
-    return int(writer_tokens) + int(editor_tokens)
+    return writer_tokens + editor_tokens
 
 
 def main() -> None:
