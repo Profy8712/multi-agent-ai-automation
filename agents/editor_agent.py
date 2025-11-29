@@ -1,41 +1,10 @@
 import json
 from typing import Dict, Any
 
-from utils.gemini_client import generate_text
+from utils.gemini_client import generate_text, GeminiAPIError
 
 
-def _clean_json_raw(text: str) -> str:
-    """
-    Cleans the raw model output to extract a valid JSON string.
-    Handles cases with Markdown code fences like ```json ... ```.
-    """
-    text = text.strip()
-
-    # Remove markdown code fences if present
-    if text.startswith("```"):
-        # Remove starting fence with optional language (e.g. ```json)
-        first_newline = text.find("\n")
-        if first_newline != -1:
-            text = text[first_newline + 1 :]
-        # Remove ending fence
-        if text.endswith("```"):
-            text = text[:-3]
-
-    return text.strip()
-
-
-def edit_linkedin_post(draft: str) -> Dict[str, Any]:
-    """
-    Agent B — Editor.
-    Takes a LinkedIn post draft, critiques it, and returns a revised version.
-
-    The model is instructed to respond strictly in JSON format:
-    {
-      "critique": "...",
-      "final_post": "..."
-    }
-    """
-    prompt = f"""
+EDITOR_SYSTEM_PROMPT = """
 You are a strict editor. You hate generic buzzwords.
 
 You will receive a LinkedIn post draft.
@@ -48,41 +17,61 @@ RESPONSE FORMAT (IMPORTANT):
 - No additional text, no markdown, no explanations.
 - Use exactly these keys: "critique" and "final_post".
 
-Example of the expected response:
-{{
+Example:
+{
   "critique": "The draft is too vague and uses generic language...",
   "final_post": "Here is the revised, punchier version..."
-}}
+}
+""".strip()
 
-Now edit this draft:
 
-DRAFT:
-\"\"\"{draft}\"\"\" 
-"""
+def edit_linkedin_post(draft: str) -> Dict[str, Any]:
+    """
+    Sends the writer's draft to Gemini (Editor persona) and returns
+    a structured result with critique and final post.
 
-    text, usage, _ = generate_text(prompt)
-
-    raw = text or ""
-    cleaned = _clean_json_raw(raw)
-
-    try:
-        data = json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        # Basic error handling: return a fallback structure
-        return {
-            "critique": f"Failed to parse JSON from model output. Error: {e}. Raw output: {raw}",
-            "final_post": draft,
-            "usage": usage,
-            "raw_output": raw,
+    Returns:
+        {
+            "critique": str,
+            "final_post": str,
+            "usage": dict,
         }
 
-    # Ensure keys exist
-    critique = data.get("critique", "").strip()
-    final_post = data.get("final_post", "").strip()
+    Raises:
+        GeminiAPIError: if Gemini API call fails.
+    """
+    prompt = (
+        f"{EDITOR_SYSTEM_PROMPT}\n\n"
+        "DRAFT:\n"
+        f"\"\"\"{draft}\"\"\""
+    )
+
+    raw_text, usage, _ = generate_text(prompt)
+
+    # Try to parse JSON, but be defensive if model returns something malformed.
+    cleaned = raw_text.strip()
+
+    # Remove Markdown fences if model returns ```json ... ```
+    if cleaned.startswith("```"):
+        first_newline = cleaned.find("\n")
+        if first_newline != -1:
+            cleaned = cleaned[first_newline + 1 :]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+
+    critique = ""
+    final_post = draft
+
+    try:
+        payload = json.loads(cleaned)
+        critique = (payload.get("critique") or "").strip()
+        final_post = (payload.get("final_post") or draft).strip()
+    except Exception:
+        # If JSON parsing fails, we still return something useful.
+        critique = f"Failed to parse JSON from editor. Raw response: {cleaned}"
 
     return {
         "critique": critique,
         "final_post": final_post,
-        "usage": usage,
-        "raw_output": raw,
+        "usage": usage or {},
     }

@@ -1,7 +1,9 @@
-from utils.gemini_client import generate_text
+from typing import Dict, Any
+
+from utils.gemini_client import generate_text, GeminiAPIError
 
 
-def generate_linkedin_draft(topic: str) -> dict:
+def generate_linkedin_draft(topic: str) -> Dict[str, Any]:
     """
     Agent A — Writer.
     Generates a LinkedIn post draft based on the given topic.
@@ -12,6 +14,9 @@ def generate_linkedin_draft(topic: str) -> dict:
             "draft": str,
             "usage": dict
         }
+
+    Raises:
+        GeminiAPIError: if the Gemini API call fails.
     """
     prompt = f"""
 You are a professional LinkedIn copywriter.
@@ -27,12 +32,12 @@ Requirements:
 - write in a natural, conversational tone
 
 Topic: "{topic}"
-"""
+""".strip()
 
     text, usage, _ = generate_text(prompt)
 
     return {
         "topic": topic,
         "draft": text.strip(),
-        "usage": usage,
+        "usage": usage or {},
     }
