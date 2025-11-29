@@ -1,0 +1,255 @@
+{
+  "name": "Multi-Agent LinkedIn Post Automation",
+  "nodes": [
+    {
+      "id": "Webhook_Node",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "multi-agent-linkedin-post",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "name": "Webhook - Topic Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "multi-agent-linkedin-post-webhook"
+    },
+    {
+      "id": "Prepare_Writer_Prompt",
+      "parameters": {
+        "functionCode": "const topic = $json[\"topic\"] || \"The future of AI Agents in Business\";\n\nconst prompt = `You are a professional LinkedIn copywriter.\n\nWrite a short LinkedIn post based on the topic below.\n\nRequirements:\n- maximum 5 sentences\n- no emojis\n- no hashtags\n- avoid generic buzzwords\n- be specific and concrete\n- write in a natural, conversational tone\n\nTopic: \"${topic}\"`;\n\nreturn [{ json: { topic, prompt } }];"
+      },
+      "name": "Function - Build Writer Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [550, 300]
+    },
+    {
+      "id": "Gemini_Writer",
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "method": "POST",
+        "authentication": "none",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "key",
+              "value": "={{$env.GEMINI_API_KEY}}"
+            }
+          ]
+        },
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "contents",
+              "value": "={\"parts\":[{\"text\": $json[\"prompt\"]}]}"
+            }
+          ]
+        },
+        "jsonParameters": true
+      },
+      "name": "HTTP - Gemini Writer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "id": "Extract_Writer_Draft",
+      "parameters": {
+        "functionCode": "const topic = $item(0).$node[\"Function - Build Writer Prompt\"].json.topic;\n\n// Gemini response structure may vary; this example assumes a candidates[0].content.parts[0].text-like output.\nconst res = $json;\nlet draft = \"\";\n\ntry {\n  const candidates = res.candidates || [];\n  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0].text) {\n    draft = candidates[0].content.parts[0].text.trim();\n  }\n} catch (e) {\n  draft = \"[ERROR] Could not parse writer response\";\n}\n\n// Optional token usage placeholder\nconst usage = res.usageMetadata || {};\n\nreturn [{ json: { topic, draft, writerUsage: usage } }];"
+      },
+      "name": "Function - Extract Writer Draft",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1150, 300]
+    },
+    {
+      "id": "Prepare_Editor_Prompt",
+      "parameters": {
+        "functionCode": "const topic = $json[\"topic\"];\nconst draft = $json[\"draft\"];\n\nconst prompt = `You are a strict editor. You hate generic buzzwords.\n\nYou will receive a LinkedIn post draft.\nYour tasks:\n1) Briefly critique the draft (maximum 3 sentences).\n2) Rewrite it to be sharper, more concrete, and more impactful.\n\nRESPONSE FORMAT (IMPORTANT):\n- Respond ONLY in valid JSON.\n- No additional text, no markdown, no explanations.\n- Use exactly these keys: \"critique\" and \"final_post\".\n\nExample:\n{\n  \"critique\": \"The draft is too vague and uses generic language...\",\n  \"final_post\": \"Here is the revised, punchier version...\"\n}\n\nDRAFT:\n\"\"\"${draft}\"\"\"`;\n\nreturn [{ json: { topic, draft, prompt, writerUsage: $json.writerUsage } }];"
+      },
+      "name": "Function - Build Editor Prompt",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1450, 300]
+    },
+    {
+      "id": "Gemini_Editor",
+      "parameters": {
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        "method": "POST",
+        "authentication": "none",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "key",
+              "value": "={{$env.GEMINI_API_KEY}}"
+            }
+          ]
+        },
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "contents",
+              "value": "={\"parts\":[{\"text\": $json[\"prompt\"]}]}"
+            }
+          ]
+        },
+        "jsonParameters": true
+      },
+      "name": "HTTP - Gemini Editor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1750, 300]
+    },
+    {
+      "id": "Parse_Editor_JSON",
+      "parameters": {
+        "functionCode": "const topic = $item(0).$node[\"Function - Build Editor Prompt\"].json.topic;\nconst draft = $item(0).$node[\"Function - Build Editor Prompt\"].json.draft;\nconst writerUsage = $item(0).$node[\"Function - Build Editor Prompt\"].json.writerUsage || {};\n\nconst res = $json;\nlet rawText = \"\";\n\ntry {\n  const candidates = res.candidates || [];\n  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0].text) {\n    rawText = candidates[0].content.parts[0].text.trim();\n  }\n} catch (e) {\n  rawText = \"[ERROR] Could not parse editor response\";\n}\n\n// Clean markdown fences\nlet cleaned = rawText.trim();\nif (cleaned.startsWith(\"```\")) {\n  const firstNewline = cleaned.indexOf(\"\\n\");\n  if (firstNewline !== -1) cleaned = cleaned.slice(firstNewline + 1);\n  if (cleaned.endsWith(\"```\")) cleaned = cleaned.slice(0, -3);\n}\n\nlet critique = \"\";\nlet finalPost = draft;\n\ntry {\n  const parsed = JSON.parse(cleaned);\n  critique = (parsed.critique || \"\").trim();\n  finalPost = (parsed.final_post || draft).trim();\n} catch (e) {\n  critique = `Failed to parse JSON from editor. Raw: ${cleaned}`;\n}\n\nconst editorUsage = res.usageMetadata || {};\n\nreturn [{\n  json: {\n    topic,\n    draft,\n    final_post: finalPost,\n    critique,\n    writerUsage,\n    editorUsage,\n    rawEditorOutput: rawText\n  }\n}];"
+      },
+      "name": "Function - Parse Editor JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2050, 300]
+    },
+    {
+      "id": "Compute_Tokens_and_Cost",
+      "parameters": {
+        "functionCode": "const TOKEN_PRICE = parseFloat($env.TOKEN_PRICE || \"0.000002\");\n\nconst writerUsage = $json.writerUsage || {};\nconst editorUsage = $json.editorUsage || {};\n\nconst writerTokens = writerUsage.totalTokenCount || writerUsage.total_tokens || 0;\nconst editorTokens = editorUsage.totalTokenCount || editorUsage.total_tokens || 0;\n\nconst totalTokens = Number(writerTokens) + Number(editorTokens);\nconst cost = totalTokens * TOKEN_PRICE;\n\nreturn [{\n  json: {\n    topic: $json.topic,\n    draft: $json.draft,\n    final_post: $json.final_post,\n    critique: $json.critique,\n    totalTokens,\n    cost\n  }\n}];"
+      },
+      "name": "Function - Tokens & Cost",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [2350, 300]
+    },
+    {
+      "id": "Google_Sheets_Append",
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sheetId": "={{$env.GOOGLE_SHEETS_ID}}",
+        "range": "Posts!A:F",
+        "options": {
+          "valueInputMode": "RAW"
+        },
+        "columns": [
+          "Timestamp",
+          "Topic",
+          "Draft (Writer)",
+          "Final Post (Editor)",
+          "Total Tokens",
+          "Cost"
+        ],
+        "values": "={{ [ new Date().toISOString(), $json.topic, $json.draft, $json.final_post, $json.totalTokens, $json.cost ] }}"
+      },
+      "name": "Google Sheets - Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [2650, 300],
+      "credentials": {
+        "googleApi": {
+          "id": "GOOGLE_API_CREDENTIAL_ID",
+          "name": "Google Service Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - Topic Trigger": {
+      "main": [
+        [
+          {
+            "node": "Function - Build Writer Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Build Writer Prompt": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Gemini Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Gemini Writer": {
+      "main": [
+        [
+          {
+            "node": "Function - Extract Writer Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Extract Writer Draft": {
+      "main": [
+        [
+          {
+            "node": "Function - Build Editor Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Build Editor Prompt": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Gemini Editor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Gemini Editor": {
+      "main": [
+        [
+          {
+            "node": "Function - Parse Editor JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Parse Editor JSON": {
+      "main": [
+        [
+          {
+            "node": "Function - Tokens & Cost",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Tokens & Cost": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Append Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "multi-agent-linkedin-workflow"
+}

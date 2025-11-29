@@ -1,54 +1,72 @@
-# Multi‑Agent AI Automation
+# 📌 Multi-Agent AI Automation  
+### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + Python
 
-This project demonstrates a multi‑agent workflow using **Google Gemini**, where two AI agents collaborate to generate, critique, and refine LinkedIn posts.  
-The final outputs are automatically logged into **Google Sheets** along with token usage and cost estimation.
+This project demonstrates a **multi-agent AI workflow** where two specialized agents collaborate to generate and refine professional LinkedIn posts:
+
+- ✍️ **Agent A (Writer)** — generates an initial draft  
+- 📝 **Agent B (Editor)** — critiques the draft and rewrites it into a sharper, more impactful version  
+
+The final results, including token usage and cost estimation, are automatically logged into **Google Sheets** via a Google Service Account.
 
 ---
 
 ## 🚀 Features
 
-- **Agent A – Writer**  
-  Generates a first‑draft LinkedIn post based on a given topic.
+### 🤖 Agent A — Writer
+Creates a concise, conversational, and professional LinkedIn post based on a given topic. The writer avoids:
 
-- **Agent B – Editor**  
-  Critiques the draft, identifies weaknesses, and produces a polished, high‑impact final version.
+- buzzwords  
+- emojis  
+- hashtags  
+- vague or generic statements  
 
-- **Google Sheets Logging**  
-  Automatically stores:
-  - Timestamp  
-  - Topic  
-  - Writer draft  
-  - Final post  
-  - Token usage  
-  - Cost estimate  
+### 🧠 Agent B — Editor
+Refines the Writer's draft and returns structured JSON:
 
-- **Cost Calculation**  
-  Based on Google Gemini token pricing.
+```json
+{
+  "critique": "…",
+  "final_post": "…"
+}
+```
 
-- **Environment‑based setup**  
-  `.env` file used for API keys and configuration.
+### 📊 Google Sheets Logging
+Each workflow run stores:
+
+- Timestamp  
+- Topic  
+- Draft (Writer)  
+- Final Post (Editor)  
+- Total Tokens  
+- Cost  
+
+### 💰 Cost Calculation
+Total tokens × price per token (configurable in `.env`).
+
+### ⚙️ Environment-Based Configuration  
+All secrets and configuration are handled using a `.env` file.
 
 ---
 
-## 📂 Project Structure
+## 📁 Project Structure
 
 ```
 multi_agent_gemini/
 │
 ├── agents/
-│   ├── writer_agent.py        # Agent A logic
-│   ├── editor_agent.py        # Agent B logic
+│   ├── writer_agent.py         # Agent A logic
+│   ├── editor_agent.py         # Agent B logic
 │   └── __init__.py
 │
 ├── utils/
-│   ├── gemini_client.py       # Gemini model wrapper
-│   ├── google_sheets.py       # Google Sheets integration
+│   ├── gemini_client.py        # Gemini API wrapper
+│   ├── google_sheets.py        # Sheets logging
 │   └── __init__.py
 │
-├── main.py                    # Entry point
+├── main.py                     # Main workflow entry point
 ├── requirements.txt
-├── .env                       # API keys (not committed)
-└── README.md
+├── .env                        # Environment variables (not included in repo)
+└── README_EN.md
 ```
 
 ---
@@ -57,22 +75,22 @@ multi_agent_gemini/
 
 ### 1. Clone the repository
 
-```
+```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
 ```
 
-### 2. Create virtual environment
+### 2. Create & activate virtual environment
 
-```
+```bash
 python -m venv venv
-source venv/bin/activate   # macOS/Linux
-venv\Scripts\activate    # Windows
+venv\Scripts\activate        # Windows
+source venv/bin/activate       # macOS/Linux
 ```
 
 ### 3. Install dependencies
 
-```
+```bash
 pip install -r requirements.txt
 ```
 
@@ -80,78 +98,87 @@ pip install -r requirements.txt
 
 ## 🔑 Environment Variables (.env)
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 
 ```
-GEMINI_API_KEY=YOUR_KEY
-GOOGLE_SERVICE_ACCOUNT_FILE=credentials.json
-GOOGLE_SHEETS_ID=YOUR_SHEET_ID
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_MODEL_NAME=models/gemini-2.5-flash
+TOKEN_PRICE=0.000002
+
+GOOGLE_SHEETS_CREDENTIALS=credentials.json
+GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID
 ```
 
 ---
 
-## ▶️ Run the workflow
+## ▶️ Running the Workflow
 
-```
+Run:
+
+```bash
 python main.py
 ```
 
-You will see:
+The script prints:
 
-- Draft post  
-- Editor review  
+- Draft (Agent A)  
+- Editor critique (Agent B)  
 - Final post  
 - Token usage  
-- Cost estimate  
-- Row added to Google Sheets  
+- Cost  
+- Confirmation of Google Sheets logging  
 
 ---
 
-## 📊 Google Sheets Setup
+## 📊 Setting Up Google Sheets
 
-1. Create a Google Sheet named **multi_agent_linkedin_posts**
+1. Create a Google Sheet  
 2. Add header row:
 
 ```
 Timestamp | Topic | Draft (Writer) | Final Post (Editor) | Total Tokens | Cost
 ```
 
-3. Enable Google APIs:
+3. Enable:
    - Google Sheets API  
    - Google Drive API  
 
-4. Create service account & JSON key
-5. Share the Sheet with the service account email
+4. Create a **service account** in Google Cloud  
+5. Download `credentials.json`  
+6. Share the sheet with the service account email (Editor access)
 
 ---
 
-## 📌 Notes
+## 🔄 Optional: n8n Integration
 
-- API keys must NOT be committed to GitHub  
-- Works on Windows, macOS, Linux  
-- Gemini model currently used: **gemini-1.5-flash**  
+An n8n workflow is included:
+
+- Webhook trigger  
+- Writer → Editor → Sheets pipeline  
+- JSON response  
+
+Import via:  
+**n8n → Settings → Import Workflow**
 
 ---
 
-## 🧩 Future Improvements
+## 🧩 Future Enhancements
 
-- Agent C: auto‑posting to LinkedIn  
-- Web interface  
+- Agent C: automatic LinkedIn posting  
+- Web dashboard  
+- API endpoint  
+- Docker support  
 - CI/CD automation  
-- Docker containerization  
 
 ---
 
 ## 📄 License
 
-MIT License  
-Free for educational and commercial use.
+MIT License — free for personal and commercial use.
 
 ---
 
-## ❤️ Author
+## 👤 Author
 
-Developed by **Profy8712**  
+**Profy8712**  
 GitHub: https://github.com/Profy8712
-
-
