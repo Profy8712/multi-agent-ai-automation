@@ -61,10 +61,19 @@ jobs:
         run: |
           echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
+      - name: Normalize Docker Hub repository name
+        id: repo
+        run: |
+          REPO=$(echo "$DOCKERHUB_REPOSITORY" | tr -d '[:space:]')
+          echo "Using repository: $REPO"
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+
       - name: Build Docker image
         run: |
-          docker build -t "$DOCKERHUB_REPOSITORY:latest" .
+          REPO="${{ steps.repo.outputs.repo }}"
+          docker build -t "${REPO}:latest" .
 
       - name: Push Docker image
         run: |
-          docker push "$DOCKERHUB_REPOSITORY:latest"
+          REPO="${{ steps.repo.outputs.repo }}"
+          docker push "${REPO}:latest"
