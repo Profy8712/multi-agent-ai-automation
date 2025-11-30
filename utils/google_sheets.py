@@ -14,9 +14,7 @@ class GoogleSheetsError(Exception):
 # Load environment variables before reading paths/IDs
 load_dotenv()
 
-# Spreadsheet configuration:
-# You can override these via environment variables if needed.
-# GOOGLE_SHEETS_ID and GOOGLE_SHEETS_WORKSHEET
+# Spreadsheet configuration
 SPREADSHEET_ID = os.getenv(
     "GOOGLE_SHEETS_ID",
     "1GJCz5exxiVOM1hCwOSJ-O-lL35k1yOUfA4jo40wPdgY",
@@ -30,9 +28,6 @@ def _get_gspread_client() -> gspread.Client:
 
     Expects a credentials.json file in the project root or a path
     specified via GOOGLE_SHEETS_CREDENTIALS environment variable.
-
-    Raises:
-        GoogleSheetsError: if credentials are missing or invalid.
     """
     credentials_path = os.getenv("GOOGLE_SHEETS_CREDENTIALS", "credentials.json")
 
@@ -72,9 +67,6 @@ def append_post_row(
 
     Columns:
         Timestamp | Topic | Draft (Writer) | Final Post (Editor) | Total Tokens | Cost
-
-    Raises:
-        GoogleSheetsError: if the sheet cannot be opened or updated.
     """
     try:
         client = _get_gspread_client()

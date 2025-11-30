@@ -1,3 +1,4 @@
+# agents/editor_agent.py
 import json
 from typing import Dict, Any
 
@@ -25,6 +26,20 @@ Example:
 """.strip()
 
 
+def _extract_json_block(text: str) -> str:
+    """
+    Extracts the JSON block from a string by taking everything
+    between the first '{' and the last '}'.
+
+    This helps when the model returns extra text around the JSON.
+    """
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return text[start : end + 1]
+    return text
+
+
 def edit_linkedin_post(draft: str) -> Dict[str, Any]:
     """
     Sends the writer's draft to Gemini (Editor persona) and returns
@@ -38,7 +53,7 @@ def edit_linkedin_post(draft: str) -> Dict[str, Any]:
         }
 
     Raises:
-        GeminiAPIError: if Gemini API call fails.
+        GeminiAPIError: if Gemini API call fails at HTTP/API level.
     """
     prompt = (
         f"{EDITOR_SYSTEM_PROMPT}\n\n"
@@ -48,22 +63,32 @@ def edit_linkedin_post(draft: str) -> Dict[str, Any]:
 
     raw_text, usage, _ = generate_text(prompt)
 
-    # Try to parse JSON, but be defensive if model returns something malformed.
     cleaned = raw_text.strip()
 
-    # Remove Markdown fences if model returns ```json ... ```
+    # If the model returned an empty response, keep the original draft
+    if not cleaned:
+        return {
+            "critique": "Editor model returned an empty response. Keeping original draft.",
+            "final_post": draft,
+            "usage": usage or {},
+        }
+
+    # Remove Markdown fences if the model returns ```json ... ```
     if cleaned.startswith("```"):
         first_newline = cleaned.find("\n")
         if first_newline != -1:
-            cleaned = cleaned[first_newline + 1 :]
+            cleaned = cleaned[first_newline + 1:]
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3]
+
+    # Try to isolate a pure JSON block
+    json_candidate = _extract_json_block(cleaned)
 
     critique = ""
     final_post = draft
 
     try:
-        payload = json.loads(cleaned)
+        payload = json.loads(json_candidate)
         critique = (payload.get("critique") or "").strip()
         final_post = (payload.get("final_post") or draft).strip()
     except Exception:
@@ -72,6 +97,6 @@ def edit_linkedin_post(draft: str) -> Dict[str, Any]:
 
     return {
         "critique": critique,
-        "final_post": final_post,
-        "usage": usage or {},
+            "final_post": final_post,
+            "usage": usage or {},
     }

@@ -7,6 +7,7 @@ from agents.editor_agent import edit_linkedin_post
 from utils.google_sheets import append_post_row, GoogleSheetsError
 from utils.gemini_client import GeminiAPIError
 
+
 # Load environment variables from .env
 load_dotenv()
 
@@ -17,16 +18,16 @@ TOKEN_PRICE = float(os.getenv("TOKEN_PRICE", 0.000002))
 def _safe_total_tokens(writer_usage, editor_usage) -> int:
     """
     Safely sums total tokens from writer and editor usage dicts.
-    Supports both old and new Gemini usage formats.
+    Supports multiple possible usage formats.
     """
 
     def _extract_total(usage: dict) -> int:
         if not isinstance(usage, dict):
             return 0
-        # New SDK: total_token_count
+        # New SDK field
         if usage.get("total_token_count") is not None:
             return int(usage.get("total_token_count") or 0)
-        # Old naming: totalTokens / total_tokens
+        # Possible legacy fields
         if usage.get("totalTokens") is not None:
             return int(usage.get("totalTokens") or 0)
         if usage.get("total_tokens") is not None:
@@ -47,8 +48,6 @@ def main() -> None:
       3. Token usage is combined.
       4. Cost is calculated.
       5. Everything is saved into Google Sheets.
-
-    Basic error handling is applied around Gemini and Google Sheets calls.
     """
     topic = "The future of AI Agents in Business"
 
