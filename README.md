@@ -6,15 +6,16 @@ This project demonstrates a **multi-agent AI workflow** where two specialized ag
 - ✍️ **Agent A (Writer)** — generates an initial draft  
 - 📝 **Agent B (Editor)** — critiques the draft and rewrites it into a sharper, more impactful version  
 
-The final results, including token usage and cost estimation, are automatically logged into **Google Sheets** via a Google Service Account.
+The final results, including token usage and estimated cost, are automatically logged into **Google Sheets** using a Google Service Account.
 
 ---
 
 ## 🚀 Features
 
 ### 🤖 Agent A — Writer
-Creates a concise, conversational, and professional LinkedIn post based on a given topic. The writer avoids:
+Generates a professional LinkedIn-style post based on a given topic.
 
+The writer avoids:
 - buzzwords  
 - emojis  
 - hashtags  
@@ -25,12 +26,12 @@ Refines the Writer's draft and returns structured JSON:
 
 ```json
 {
-  "critique": "…",
-  "final_post": "…"
+  "critique": "...",
+  "final_post": "..."
 }
 ```
 
-### 📊 Google Sheets Logging
+### 📊 Google Sheets Logging  
 Each workflow run stores:
 
 - Timestamp  
@@ -38,13 +39,14 @@ Each workflow run stores:
 - Draft (Writer)  
 - Final Post (Editor)  
 - Total Tokens  
-- Cost  
+- Estimated Cost  
 
-### 💰 Cost Calculation
-Total tokens × price per token (configurable in `.env`).
+### 💰 Cost Calculation  
+Uses:  
+`total_tokens × TOKEN_PRICE` (configurable in `.env`).
 
 ### ⚙️ Environment-Based Configuration  
-All secrets and configuration are handled using a `.env` file.
+All secrets and configuration are managed via a `.env` file.
 
 ---
 
@@ -65,8 +67,8 @@ multi_agent_gemini/
 │
 ├── main.py                     # Main workflow entry point
 ├── requirements.txt
-├── .env                        # Environment variables (not included in repo)
-└── README_EN.md
+├── .env.example                # Configuration template
+└── README.md                   # Documentation
 ```
 
 ---
@@ -85,7 +87,7 @@ cd multi-agent-ai-automation
 ```bash
 python -m venv venv
 venv\Scripts\activate        # Windows
-source venv/bin/activate       # macOS/Linux
+source venv/bin/activate     # macOS / Linux
 ```
 
 ### 3. Install dependencies
@@ -121,11 +123,11 @@ python main.py
 
 The script prints:
 
-- Draft (Agent A)  
-- Editor critique (Agent B)  
-- Final post  
+- Writer Draft  
+- Editor Critique  
+- Editor Final Post  
 - Token usage  
-- Cost  
+- Estimated cost  
 - Confirmation of Google Sheets logging  
 
 ---
@@ -140,22 +142,22 @@ Timestamp | Topic | Draft (Writer) | Final Post (Editor) | Total Tokens | Cost
 ```
 
 3. Enable:
-   - Google Sheets API  
-   - Google Drive API  
+- Google Sheets API  
+- Google Drive API  
 
-4. Create a **service account** in Google Cloud  
+4. Create a **Service Account** in Google Cloud  
 5. Download `credentials.json`  
-6. Share the sheet with the service account email (Editor access)
+6. Share the sheet with your Service Account email (Editor access)
 
 ---
 
 ## 🔄 Optional: n8n Integration
 
-An n8n workflow is included:
+An optional n8n workflow is included featuring:
 
 - Webhook trigger  
-- Writer → Editor → Sheets pipeline  
-- JSON response  
+- Writer → Editor → Google Sheets pipeline  
+- JSON API response  
 
 Import via:  
 **n8n → Settings → Import Workflow**
@@ -166,9 +168,10 @@ Import via:
 
 - Agent C: automatic LinkedIn posting  
 - Web dashboard  
-- API endpoint  
-- Docker support  
+- REST API endpoint  
+- Docker containerization  
 - CI/CD automation  
+- Error reporting dashboard  
 
 ---
 
