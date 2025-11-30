@@ -1,57 +1,59 @@
-# 🚀 Multi-Agent AI Automation  
-### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker
+# 🚀 Multi-Agent AI Automation
+### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker + CI/CD
 
-This project implements a production-ready **multi-agent AI workflow** where:
-- **Agent A (Writer)** generates a LinkedIn draft  
-- **Agent B (Editor)** critiques and improves the draft in strict JSON  
-- Everything is logged into **Google Sheets**  
-- A **REST API** exposes the workflow  
-- The entire service runs inside **Docker**
+This project implements a production-ready **multi-agent AI automation workflow** including:
+
+- 🤖 **Agent A (Writer)** — generates LinkedIn-style content  
+- 🧠 **Agent B (Editor)** — critiques and rewrites it in strict JSON  
+- 🌐 **FastAPI REST API** — exposes the workflow  
+- 📊 **Google Sheets logging**  
+- 🐳 **Docker containerization**  
+- 🔄 **CI/CD with GitHub Actions + Docker Hub push**
 
 ---
 
-# ⭐ Overview
+# ⭐ Features
 
 ### ✍️ Agent A — Writer  
-Creates concise, concrete, buzzword-free LinkedIn-style drafts.  
-Includes retry logic when Gemini returns empty responses.
+- Generates a clean, concise, buzzword-free LinkedIn draft  
+- Includes retry logic for empty Gemini responses  
+- Uses Google Gemini API (Flash model)
 
 ### 📝 Agent B — Editor  
-Strict editorial persona:  
-- provides critique  
-- rewrites content  
-- always returns JSON  
-- automatically cleans malformed model outputs
+- Strict editor persona  
+- Returns **valid JSON**, always:  
+```json
+{
+  "critique": "...",
+  "final_post": "..."
+}
+```
+- Automatically sanitizes malformed outputs  
+- Improves clarity, removes buzzwords, sharpens message  
 
 ### 📊 Google Sheets Logging  
-Each run saves:
+Each request logs:
+
 - Timestamp  
 - Topic  
-- Writer draft  
-- Final edited version  
+- Draft  
+- Final post  
 - Token usage  
-- Estimated cost  
+- Estimated cost
 
 ### 🌐 REST API (FastAPI)
-Main endpoint:
+Endpoint:
 
 ```
 POST /generate-post
 ```
 
-Input:
+Example request:
 ```json
-{ "topic": "Your topic here" }
+{ "topic": "The future of AI automation" }
 ```
 
-Output:
-- draft  
-- critique  
-- final_post  
-- tokens  
-- cost  
-
-Swagger docs:  
+Swagger UI:  
 👉 http://localhost:8000/docs
 
 ---
@@ -59,7 +61,7 @@ Swagger docs:
 # 📂 Project Structure
 
 ```
-multi_agent_gemini/
+multi-agent-gemini/
 │
 ├── agents/
 │   ├── writer_agent.py
@@ -73,7 +75,6 @@ multi_agent_gemini/
 ├── main.py
 ├── Dockerfile
 ├── docker-compose.yml
-├── .dockerignore
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -81,9 +82,9 @@ multi_agent_gemini/
 
 ---
 
-# 🔧 Installation
+# 🔧 Local Installation
 
-Clone the project:
+Clone:
 
 ```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
@@ -94,8 +95,8 @@ Create virtual environment:
 
 ```bash
 python -m venv venv
-source venv/bin/activate   # macOS/Linux
-venv\Scripts\activate    # Windows
+source venv/bin/activate      # macOS / Linux
+venv\Scripts\activate       # Windows
 ```
 
 Install dependencies:
@@ -111,43 +112,40 @@ pip install -r requirements.txt
 Create a `.env` file:
 
 ```
-GEMINI_API_KEY=YOUR_KEY
+GEMINI_API_KEY=YOUR_GEMINI_KEY
 GEMINI_MODEL_NAME=models/gemini-2.5-flash
 TOKEN_PRICE=0.000002
 
 GOOGLE_SHEETS_CREDENTIALS=credentials.json
-GOOGLE_SHEETS_ID=YOUR_SHEET_ID
+GOOGLE_SHEETS_ID=YOUR_GOOGLE_SHEET_ID
 ```
 
-Copy `.env.example` as baseline if needed.
+Use `.env.example` as a template.
 
 ---
 
-# ▶️ Running via Python
+# ▶️ Running Locally
+
+Run main script:
 
 ```bash
 python main.py
 ```
 
----
-
-# 🌐 Running REST API
-
-Start server:
+Run API:
 
 ```bash
 uvicorn api:app --reload
 ```
 
-Swagger docs:
-
+Swagger docs:  
 👉 http://127.0.0.1:8000/docs
 
 ---
 
 # 🐳 Docker Support
 
-### Build + run in background:
+### Start container:
 
 ```bash
 docker compose up -d --build
@@ -159,47 +157,90 @@ docker compose up -d --build
 docker compose down
 ```
 
-API available at:
-
+API available at:  
 👉 http://localhost:8000
+
+---
+
+# 🐳 Dockerfile Overview
+
+- Python 3.11 slim  
+- Installs dependencies  
+- Runs FastAPI via Uvicorn  
+- Production-ready container  
+
+---
+
+# 🔄 CI/CD (GitHub Actions + Docker Hub)
+
+Workflow file:  
+`.github/workflows/ci-cd.yml`
+
+Pipeline steps:
+
+1️⃣ Lint & compile Python code  
+2️⃣ Run tests (if any)  
+3️⃣ Build Docker image  
+4️⃣ Login to Docker Hub  
+5️⃣ Push `latest` tag  
+
+### Required GitHub Secrets 🎯
+
+| Secret | Value |
+|--------|--------|
+| `REGISTRY_USERNAME` | Docker Hub username |
+| `REGISTRY_PASSWORD` | Docker Hub Personal Access Token |
+| `REGISTRY_REPOSITORY` | profy025/multi-agent-ai-automation |
+
+Trigger:  
+- Push to **main**  
+- Pull requests to **main**
 
 ---
 
 # 📊 Google Sheets Setup
 
-1. Create Google Sheet  
-2. Header row:
+1. Create a new Google Sheet  
+2. Add this header row:
 
 ```
 Timestamp | Topic | Draft | Final Post | Total Tokens | Cost
 ```
 
-3. Enable Sheets + Drive API  
-4. Create Service Account  
-5. Download `credentials.json`  
-6. Share Sheet with service account email
+3. Go to Google Cloud Console  
+4. Enable:
+   - Google Sheets API
+   - Google Drive API  
+5. Create a **Service Account**  
+6. Download `credentials.json`  
+7. Share your sheet with the service account email  
 
 ---
 
-# 🧩 Technologies Used
+# 🧩 Technology Stack
+
 - FastAPI  
 - Google Gemini API  
 - gspread  
-- Uvicorn  
-- Docker  
+- OAuth2 Service Account  
+- Docker / Docker Compose  
+- GitHub Actions  
 - Python 3.11  
 
 ---
 
-# 🛠️ Future Enhancements
-- Agent C (auto publishing)  
-- Authentication for REST API  
-- GitHub Actions (CI/CD)  
-- Multi-stage production Dockerfile  
-- Monitoring & logging dashboard  
+# 🔮 Future Enhancements
+
+- Agent C (auto LinkedIn posting)  
+- Web UI Dashboard  
+- Kubernetes deployment  
+- Grafana monitoring  
+- Rate-limiter & caching  
+- OAuth2 authentication  
 
 ---
 
-# 👤 Author  
+# 👤 Author
+
 **Profy8712**  
-https://github.com/Profy8712
+👉 https://github.com/Profy8712
