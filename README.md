@@ -1,240 +1,159 @@
 # 🚀 Multi-Agent AI Automation
-### Automated LinkedIn Post Generator using Google Gemini + Google Sheets + FastAPI + Docker + CI/CD
+### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker + n8n
 
-This project implements a **production-grade multi-agent AI workflow** with:
-- 🤖 **Agent A — Writer** (generates LinkedIn post draft)
-- 🧠 **Agent B — Editor** (critiques and rewrites in strict JSON)
-- 🌐 **FastAPI REST API**
-- 📊 **Google Sheets logging**
-- 🐳 **Docker / Docker Compose**
-- 🔄 **CI/CD via GitHub Actions + Docker Hub**
-- 🛡 **Robust error handling** (detailed below)
+This project provides a **production-grade multi-agent automation system** integrating:
+
+- **Google Gemini AI** (Writer Agent + Editor Agent)  
+- **Google Sheets logging**
+- **FastAPI REST API**
+- **Docker containerization**
+- **GitHub Actions CI/CD**
+- **n8n workflow automation (Webhook → AI → Sheets)**
+
+All components together form an end‑to‑end automated content generation pipeline.
 
 ---
 
 # ⭐ Features
 
-### ✍️ Agent A — Writer  
-- Generates clean, concrete, business-style drafts  
-- Avoids buzzwords, emojis, vague statements  
-- Retries automatically if Gemini returns empty/blocked content  
+## ✍️ Agent A — Writer  
+Generates a LinkedIn-style draft based on a topic.  
+Characteristics:
+- No buzzwords
+- No emojis / hashtags  
+- Max 5 sentences  
+- Natural, professional tone  
+- Retry logic for empty Gemini responses  
+- Robust error handling  
 
-### 🧠 Agent B — Editor  
-- Returns strict JSON:  
+---
+
+## 📝 Agent B — Editor  
+A strict editor persona that:
+- Critiques the draft (max 3 sentences)
+- Rewrites it in a stronger, punchier tone
+- ALWAYS returns **valid JSON**:
 ```json
 {
   "critique": "...",
   "final_post": "..."
 }
 ```
-- Removes buzzwords, sharpens message  
-- Automatically fixes malformed JSON returned by Gemini  
-- Protects against unexpected editor output  
 
-### 🌐 FastAPI REST API  
+The system automatically:
+- Cleans malformed JSON  
+- Removes backticks, markdown fences  
+- Ensures structured output  
+
+---
+
+## 📊 Google Sheets Logging  
+Every processed request is saved with:
+
+- Timestamp  
+- Topic  
+- Writer Draft  
+- Editor Final Post  
+- Total Tokens  
+- Estimated Cost  
+
+Google Sheets is accessed via a **Google Service Account**.
+
+---
+
+## 🌐 REST API (FastAPI)
+
 Main endpoint:
 
-```
-POST /generate-post
-```
+### `POST /generate-post`
 
-Request:
+Input:
 ```json
 { "topic": "Your topic here" }
 ```
 
-Response includes:
-- writer draft  
-- editor critique  
-- final edited post  
-- token usage  
-- cost  
-
-Docs: 👉 http://localhost:8000/docs
-
-### 📊 Google Sheets Logging  
-Every request is stored:
-- Timestamp  
-- Topic  
-- Draft  
-- Final post  
-- Tokens  
-- Cost  
-
-### 🐳 Docker Support  
-Run entire service in an isolated container.
-
-### 🔄 CI/CD  
-Automatic:
-- Tests  
-- Docker build  
-- Docker Hub push  
-
----
-
-# 🛡 🛡 🛡 **ERROR HANDLING (FULL, DETAILED, PRODUCTION-GRADE)**
-
-The project includes **multi-layer error protection** to ensure reliability.
-
----
-
-# 1️⃣ Gemini API Error Handling
-
-### ✔️ Case: Gemini returns empty response  
-Gemini sometimes returns 0 tokens (blocked content/safety flags).  
-Writer agent handles this with **retries + fallback**:
-
-```python
-for _ in range(3):
-    try:
-        text, usage, _ = generate_text(prompt)
-        if text.strip():
-            return {...}
-    except GeminiAPIError:
-        last_error = exc
-```
-
-After 3 failures:
-
-- fallback draft is returned  
-- execution **does not crash**  
-- error is logged  
-
----
-
-### ✔️ Case: Gemini API connectivity failure
-
-Handled in `gemini_client.py`:
-
-```python
-except Exception as exc:
-    raise GeminiAPIError(f"Gemini API request failed: {exc}")
-```
-
-The rest of the app receives a controlled exception.
-
----
-
-### ✔️ Case: response has no .text field  
-Gemini sometimes returns candidates without `.text`.  
-We reconstruct text manually:
-
-```python
-for cand in response.candidates:
-    for part in cand.content.parts:
-        if part.text:
-            parts.append(part.text)
-```
-
-If still empty → **error raised intentionally**:
-
-```python
-raise GeminiAPIError("Gemini returned an empty response.")
-```
-
----
-
-# 2️⃣ Editor JSON Parsing Errors
-
-Gemini sometimes returns invalid JSON.
-
-Example of malformed model output:
-
-```
-{
-  "critique": "..."
-  "final_post": ...
-```
-
-Editor handles this via:
-
-```python
-try:
-    payload = json.loads(cleaned)
-except Exception:
-    critique = f"Failed to parse JSON from editor. Raw response: {cleaned}"
-```
-
-In worst-case:
-- critique explains the failure  
-- original draft is preserved  
-- service continues running  
-
----
-
-# 3️⃣ Google Sheets Logging Errors
-
-If Google Sheets fails (e.g., invalid credentials, rate limits, API outage):
-
-```python
-except GoogleSheetsError as exc:
-    print("[WARNING] Failed to write data to Google Sheets.")
-```
-
-⚠️ Importantly:  
-**The post generation STILL succeeds.**  
-Sheets logging is optional—not critical.
-
----
-
-# 4️⃣ FastAPI Error Handling
-
-### ✔️ Invalid request  
-Handled automatically by Pydantic → 422 Unprocessable Entity
-
-### ✔️ Gemini error  
-Returned as structured 500:
-
+Output:
 ```json
 {
-  "detail": "Gemini failed: <error>"
+  "draft": "...",
+  "critique": "...",
+  "final_post": "...",
+  "tokens": 123,
+  "cost": 0.000246
 }
 ```
 
-### ✔️ Sheets error  
-Returned as 503:
+Interactive API docs:  
+👉 http://localhost:8000/docs
 
-```json
-{
-  "detail": "Google Sheets is unavailable"
-}
+---
+
+## 🐳 Docker Support
+
+Build and run the service in background:
+
+```bash
+docker compose up -d --build
 ```
 
-The API never exposes raw tracebacks.
+Stop:
+```bash
+docker compose down
+```
+
+API will be available at:
+👉 http://localhost:8000
 
 ---
 
-# 5️⃣ Docker Runtime Error Isolation
+## 🔄 n8n Workflow Automation
 
-Docker ensures:
+A complete workflow is included:
 
-- environment consistency  
-- no dependency conflicts  
-- API always starts cleanly  
-- logs are isolated  
+**File:**  
+```
+/n8n_multi_agent_workflow.json
+```
 
-If the container fails → systemd / Docker restart policies can be added.
+### Workflow steps:
+1. Webhook trigger  
+2. Agent A — Writer call  
+3. Agent B — Editor call  
+4. Error-handling path (JSON check, retries)  
+5. Google Sheets append  
+6. Respond with final JSON  
 
----
+### Import instructions:
 
-# 6️⃣ CI/CD Error Handling
+1. Open **n8n**
+2. Go to **Workflows → Import**
+3. Upload:  
+   ```
+   n8n_multi_agent_workflow.json
+   ```
+4. Configure credentials:
+   - Gemini API Key
+   - Google Sheets Service Account
+5. Activate workflow
 
-GitHub Actions pipeline includes:
+### Webhook usage:
+You will get a link like:
 
-- syntax check (compileall)
-- pip install validation
-- Docker registry authentication verification
-- safe repository name sanitization (`tr -d '[:space:]'`)
-- conditional push only on `main`
+```
+POST https://n8n.your-domain.com/webhook/ai-post-generator
+```
 
-Broken builds never reach production.
+Body:
+```json
+{ "topic": "The future of AI Agents in Business" }
+```
 
 ---
 
 # 📂 Project Structure
 
 ```
-multi-agent-gemini/
+multi_agent_gemini/
 │
 ├── agents/
 │   ├── writer_agent.py
@@ -248,6 +167,7 @@ multi-agent-gemini/
 ├── main.py
 ├── Dockerfile
 ├── docker-compose.yml
+├── n8n_multi_agent_workflow.json
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -257,21 +177,22 @@ multi-agent-gemini/
 
 # 🔧 Installation
 
+Clone repo:
+
 ```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
 ```
 
-Create venv:
+Create env:
 
 ```bash
 python -m venv venv
-source venv/bin/activate
-# Windows:
-# venv\Scripts\activate
+source venv/bin/activate      # macOS / Linux
+venv\Scripts\activate       # Windows
 ```
 
-Install:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -281,7 +202,7 @@ pip install -r requirements.txt
 
 # 🔑 Environment Variables
 
-Create `.env`:
+Create a `.env`:
 
 ```
 GEMINI_API_KEY=YOUR_KEY
@@ -289,59 +210,91 @@ GEMINI_MODEL_NAME=models/gemini-2.5-flash
 TOKEN_PRICE=0.000002
 
 GOOGLE_SHEETS_CREDENTIALS=credentials.json
-GOOGLE_SHEETS_ID=YOUR_SHEET_ID
+GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID
 ```
 
 ---
 
-# 🌐 Start API
+# ▶️ Run from CLI
+
+```bash
+python main.py
+```
+
+---
+
+# 🌐 Run API server
 
 ```bash
 uvicorn api:app --reload
 ```
 
-Docs:  
-👉 http://localhost:8000/docs
+Docs: http://127.0.0.1:8000/docs
 
 ---
 
-# 🐳 Docker
+# ⚙️ CI/CD – GitHub Actions
 
-Run:
+The project includes a production-ready pipeline:
 
-```bash
-docker compose up -d --build
+### ✔️ On push to `main`:
+- Install Python  
+- Lint & syntax check  
+- Build Docker image  
+- Push image to Docker Hub  
+- Validate workflow  
+
+Config file:  
+```
+.github/workflows/ci-cd.yml
 ```
 
-Stop:
+### Required GitHub secrets:
 
-```bash
-docker compose down
-```
+| Secret | Purpose |
+|--------|---------|
+| `DOCKERHUB_USERNAME` | Docker Hub login |
+| `DOCKERHUB_TOKEN` | Access token |
+| `GOOGLE_SHEETS_ID` | Spreadsheet |
+| `GEMINI_API_KEY` | Gemini auth |
 
 ---
 
-# 🔄 CI/CD
+# 🧩 Error Handling
 
-Pipeline file: `.github/workflows/ci-cd.yml`
+### Gemini client handles:
+- Empty responses  
+- Blocked responses  
+- Missing parts  
+- JSON parse errors  
+- Auto‑retry logic  
 
-Secrets required:
+### API layer handles:
+- Missing topic field  
+- Upstream AI errors  
+- Sheets write failures  
+- HTTP 500 wrapping  
 
-| Secret | Value |
-|--------|--------|
-| `REGISTRY_USERNAME` | Docker Hub username |
-| `REGISTRY_PASSWORD` | Docker Hub token |
-| `REGISTRY_REPOSITORY` | profy025/multi-agent-ai-automation |
+### n8n workflow handles:
+- JSON validation  
+- Retry on Gemini call  
+- Fallback response  
+- Structured logging  
 
-Workflow on push to `main`:
+---
 
-- syntax check  
-- build docker image  
-- push to Docker Hub  
+# 🛠️ Technologies
+- Python 3.11  
+- FastAPI  
+- Google Gemini API  
+- gspread  
+- Uvicorn  
+- Docker + Docker Compose  
+- GitHub Actions  
+- n8n workflow engine  
 
 ---
 
 # 👤 Author
-
 **Profy8712**  
 https://github.com/Profy8712
