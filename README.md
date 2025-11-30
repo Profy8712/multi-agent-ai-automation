@@ -1,46 +1,58 @@
 # 🚀 Multi-Agent AI Automation  
-### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI
+### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker
 
-This project implements a production-style **multi-agent AI workflow** where two AI personas collaborate to create and refine high-quality LinkedIn posts.  
-The system also stores results in Google Sheets and exposes a REST API for external automations (n8n, Make, Zapier, frontend apps).
+This project implements a production-ready **multi-agent AI workflow** where:
+- **Agent A (Writer)** generates a LinkedIn draft  
+- **Agent B (Editor)** critiques and improves the draft in strict JSON  
+- Everything is logged into **Google Sheets**  
+- A **REST API** exposes the workflow  
+- The entire service runs inside **Docker**
 
 ---
 
 # ⭐ Overview
 
-This workflow consists of two independent agents:
-
 ### ✍️ Agent A — Writer  
-Creates a concise, concrete, buzzword-free LinkedIn draft based on a topic.
+Creates concise, concrete, buzzword-free LinkedIn-style drafts.  
+Includes retry logic when Gemini returns empty responses.
 
 ### 📝 Agent B — Editor  
-Acts as a strict professional editor:
-- critiques the draft  
-- rewrites it into a sharper, punchier version  
-- responds in structured JSON  
+Strict editorial persona:  
+- provides critique  
+- rewrites content  
+- always returns JSON  
+- automatically cleans malformed model outputs
 
 ### 📊 Google Sheets Logging  
-Each run automatically stores:
-- timestamp  
-- topic  
-- writer draft  
-- editor final version  
-- token usage  
-- estimated API cost  
+Each run saves:
+- Timestamp  
+- Topic  
+- Writer draft  
+- Final edited version  
+- Token usage  
+- Estimated cost  
 
-### 🔌 REST API Endpoint  
-FastAPI endpoint:
+### 🌐 REST API (FastAPI)
+Main endpoint:
 
 ```
 POST /generate-post
 ```
 
-Allows triggering the workflow from:
-- n8n  
-- Make  
-- Postman  
-- Websites  
-- Any external system
+Input:
+```json
+{ "topic": "Your topic here" }
+```
+
+Output:
+- draft  
+- critique  
+- final_post  
+- tokens  
+- cost  
+
+Swagger docs:  
+👉 http://localhost:8000/docs
 
 ---
 
@@ -50,15 +62,18 @@ Allows triggering the workflow from:
 multi_agent_gemini/
 │
 ├── agents/
-│   ├── writer_agent.py         # Agent A: draft generation
-│   ├── editor_agent.py         # Agent B: critique + rewrite
+│   ├── writer_agent.py
+│   ├── editor_agent.py
 │
 ├── utils/
-│   ├── gemini_client.py        # Gemini API wrapper with safe fallbacks
-│   ├── google_sheets.py        # Google Sheets logging
+│   ├── gemini_client.py
+│   ├── google_sheets.py
 │
-├── main.py                     # CLI version of the workflow
-├── api.py                      # REST API (FastAPI)
+├── api.py
+├── main.py
+├── Dockerfile
+├── docker-compose.yml
+├── .dockerignore
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -68,14 +83,14 @@ multi_agent_gemini/
 
 # 🔧 Installation
 
-### 1. Clone the repository
+Clone the project:
 
 ```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
 ```
 
-### 2. Create a virtual environment
+Create virtual environment:
 
 ```bash
 python -m venv venv
@@ -83,7 +98,7 @@ source venv/bin/activate   # macOS/Linux
 venv\Scripts\activate    # Windows
 ```
 
-### 3. Install dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -96,130 +111,95 @@ pip install -r requirements.txt
 Create a `.env` file:
 
 ```
-GEMINI_API_KEY=YOUR_GEMINI_KEY
+GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL_NAME=models/gemini-2.5-flash
 TOKEN_PRICE=0.000002
 
 GOOGLE_SHEETS_CREDENTIALS=credentials.json
-GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID
+GOOGLE_SHEETS_ID=YOUR_SHEET_ID
 ```
 
-You can copy `.env.example` and fill in your values.
+Copy `.env.example` as baseline if needed.
 
 ---
 
-# ▶️ Running the Workflow (CLI Version)
+# ▶️ Running via Python
 
 ```bash
 python main.py
 ```
 
-You will get:
-
-- Writer draft  
-- Editor critique  
-- Final post  
-- Token usage  
-- Estimated cost  
-- Google Sheets confirmation  
-
 ---
 
-# 🌐 Running the REST API
+# 🌐 Running REST API
 
-Start the API server:
+Start server:
 
 ```bash
 uvicorn api:app --reload
 ```
 
-Open interactive docs:
+Swagger docs:
 
-👉 **http://127.0.0.1:8000/docs**
+👉 http://127.0.0.1:8000/docs
 
-Send a POST request:
+---
 
-```json
-{
-  "topic": "The future of AI agents in business"
-}
+# 🐳 Docker Support
+
+### Build + run in background:
+
+```bash
+docker compose up -d --build
 ```
 
-The response includes:
+### Stop:
 
-- draft  
-- critique  
-- final post  
-- total tokens  
-- cost  
+```bash
+docker compose down
+```
+
+API available at:
+
+👉 http://localhost:8000
 
 ---
 
 # 📊 Google Sheets Setup
 
-1. Create a Google Sheet  
-2. Add header row:
+1. Create Google Sheet  
+2. Header row:
 
 ```
 Timestamp | Topic | Draft | Final Post | Total Tokens | Cost
 ```
 
-3. In Google Cloud Console:
-   - enable Google Sheets API  
-   - enable Google Drive API  
-   - create a Service Account  
-   - download `credentials.json`  
-
-4. Share the Google Sheet with:
-```
-your-service-account@project.iam.gserviceaccount.com
-```
+3. Enable Sheets + Drive API  
+4. Create Service Account  
+5. Download `credentials.json`  
+6. Share Sheet with service account email
 
 ---
 
-# 🔄 n8n Integration (Optional)
-
-1. Create Webhook node  
-2. Add HTTP node that calls:
-
-```
-POST http://your-server:8000/generate-post
-```
-
-3. Pass `topic` from webhook payload  
-4. Use the API response anywhere in your automation
-
----
-
-# 🛠️ Technologies Used
-
-- Python  
+# 🧩 Technologies Used
 - FastAPI  
 - Google Gemini API  
-- Google Sheets API (gspread)  
-- pydantic  
-- uvicorn  
-- python-dotenv  
+- gspread  
+- Uvicorn  
+- Docker  
+- Python 3.11  
 
 ---
 
-# 🧩 Future Enhancements
-
-- Agent C: Auto-publishing to LinkedIn  
-- API Key authentication for REST API  
-- Dockerfile + containerization  
-- GitHub Actions CI/CD  
-- n8n/Make templates  
-- Health-check endpoint  
-- Error monitoring dashboard  
-
----
-
-# 📄 License  
-MIT — free for personal and commercial use.
+# 🛠️ Future Enhancements
+- Agent C (auto publishing)  
+- Authentication for REST API  
+- GitHub Actions (CI/CD)  
+- Multi-stage production Dockerfile  
+- Monitoring & logging dashboard  
 
 ---
 
 # 👤 Author  
 **Profy8712**  
-GitHub: https://github.com/Profy8712
+https://github.com/Profy8712
