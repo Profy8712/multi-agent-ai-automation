@@ -1,6 +1,8 @@
 import os
 
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
 from agents.writer_agent import generate_linkedin_draft
 from agents.editor_agent import edit_linkedin_post
@@ -40,54 +42,58 @@ def _safe_total_tokens(writer_usage, editor_usage) -> int:
     return writer_tokens + editor_tokens
 
 
-def main() -> None:
+class TopicRequest(BaseModel):
+    """Incoming payload with a single topic field."""
+    topic: str
+
+
+class PostResponse(BaseModel):
+    """Structured response for the generated and edited post."""
+    topic: str
+    draft: str
+    critique: str
+    final_post: str
+    total_tokens: int
+    cost: float
+
+
+app = FastAPI(title="Multi-Agent LinkedIn Post API")
+
+
+@app.post("/generate-post", response_model=PostResponse)
+async def generate_post(payload: TopicRequest) -> PostResponse:
     """
-    Main workflow:
-      1. Writer Agent generates a draft.
-      2. Editor Agent critiques and rewrites it.
-      3. Token usage is combined.
-      4. Cost is calculated.
-      5. Everything is saved into Google Sheets.
+    REST endpoint that runs the full workflow:
+
+    1. Writer agent generates a draft.
+    2. Editor agent critiques and refines the draft.
+    3. Token usage is combined and cost is calculated.
+    4. The result is appended to Google Sheets.
+    5. The final structured result is returned as JSON.
     """
-    topic = "The future of AI Agents in Business"
+    topic = payload.topic
 
     try:
-        # --- Step 1: Writer Agent ---
+        # Step 1: Writer agent
         writer_result = generate_linkedin_draft(topic)
 
-        # --- Step 2: Editor Agent ---
+        # Step 2: Editor agent
         editor_result = edit_linkedin_post(writer_result["draft"])
 
     except GeminiAPIError as exc:
-        print("\n[ERROR] Gemini API failed during content generation.")
-        print(f"Details: {exc}")
-        return
+        # Upstream LLM error: return 502 to indicate bad gateway from model
+        raise HTTPException(
+            status_code=502,
+            detail=f"Gemini API failed during content generation: {exc}",
+        )
 
-    # --- Step 3: Token calculation ---
+    # Step 3: Token calculation
     total_tokens = _safe_total_tokens(writer_result["usage"], editor_result["usage"])
 
-    # --- Step 4: Cost calculation ---
+    # Step 4: Cost calculation
     cost = total_tokens * TOKEN_PRICE
 
-    # --- Print results ---
-    print("TOPIC:", writer_result["topic"])
-
-    print("\n--- DRAFT (Agent A) ---\n")
-    print(writer_result["draft"])
-
-    print("\n--- EDITOR CRITIQUE (Agent B) ---\n")
-    print(editor_result["critique"])
-
-    print("\n--- FINAL POST (Agent B) ---\n")
-    print(editor_result["final_post"])
-
-    print("\n--- TOKEN USAGE ---")
-    print("Writer usage:", writer_result["usage"])
-    print("Editor usage:", editor_result["usage"])
-    print("Total tokens:", total_tokens)
-    print("Estimated cost:", cost)
-
-    # --- Step 5: Save to Google Sheets ---
+    # Step 5: Log to Google Sheets (non-fatal if it fails)
     try:
         append_post_row(
             topic=topic,
@@ -96,12 +102,15 @@ def main() -> None:
             total_tokens=total_tokens,
             cost=cost,
         )
-        print("\nRow successfully appended to Google Sheets.")
     except GoogleSheetsError as exc:
-        print("\n[WARNING] Failed to write data to Google Sheets.")
-        print(f"Details: {exc}")
-        print("The workflow finished, but the result was not logged to the sheet.")
+        # Log the error to console, but do not break the API response
+        print("[WARNING] Failed to append row to Google Sheets:", exc)
 
-
-if __name__ == "__main__":
-    main()
+    return PostResponse(
+        topic=topic,
+        draft=writer_result["draft"],
+        critique=editor_result["critique"],
+        final_post=editor_result["final_post"],
+        total_tokens=total_tokens,
+        cost=cost,
+    )
