@@ -42,54 +42,29 @@ jobs:
           fi
 
   build-and-push-docker:
-    name: Build & (optional) push Docker image
+    name: Build & push Docker image to Docker Hub
     runs-on: ubuntu-latest
     needs: lint-and-test
     # Only on push to main
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
     env:
-      IMAGE_NAME: multi-agent-gemini
+      DOCKERHUB_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.REGISTRY_PASSWORD }}
+      DOCKERHUB_REPOSITORY: ${{ secrets.REGISTRY_REPOSITORY }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker registry credentials
-        if: env.REGISTRY_ENABLED != 'false'
-        env:
-          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-          REGISTRY_SERVER: ${{ secrets.REGISTRY_SERVER }}
+      - name: Log in to Docker Hub
         run: |
-          if [ -z "$REGISTRY_USERNAME" ] || [ -z "$REGISTRY_PASSWORD" ] || [ -z "$REGISTRY_SERVER" ]; then
-            echo "Registry secrets not set. Skipping docker login and push."
-            echo "REGISTRY_ENABLED=false" >> $GITHUB_ENV
-          else
-            echo "Logging into Docker registry: $REGISTRY_SERVER"
-            echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY_SERVER" -u "$REGISTRY_USERNAME" --password-stdin
-          fi
+          echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
       - name: Build Docker image
         run: |
-          docker build -t $IMAGE_NAME:latest .
+          docker build -t "$DOCKERHUB_REPOSITORY:latest" .
 
-      - name: Tag and push image to registry (optional)
-        if: env.REGISTRY_ENABLED != 'false'
-        env:
-          REGISTRY_SERVER: ${{ secrets.REGISTRY_SERVER }}
-          REGISTRY_REPOSITORY: ${{ secrets.REGISTRY_REPOSITORY }}
+      - name: Push Docker image
         run: |
-          # Default: use GitHub owner/repo name if custom repo is not set
-          if [ -z "$REGISTRY_REPOSITORY" ]; then
-            REPO="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          else
-            REPO="$REGISTRY_REPOSITORY"
-          fi
-
-          FULL_IMAGE_NAME="$REGISTRY_SERVER/$REPO:$GITHUB_SHA"
-
-          echo "Tagging image as $FULL_IMAGE_NAME"
-          docker tag $IMAGE_NAME:latest "$FULL_IMAGE_NAME"
-
-          echo "Pushing image..."
-          docker push "$FULL_IMAGE_NAME"
+          docker push "$DOCKERHUB_REPOSITORY:latest"
