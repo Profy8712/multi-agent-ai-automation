@@ -1,0 +1,15 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: multi-agent-gemini-app
+    # Load environment variables from .env file
+    env_file:
+      - .env
+    # Mount credentials.json into the container
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+    ports:
+      - "8000:8000"
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
