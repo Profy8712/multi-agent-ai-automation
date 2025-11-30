@@ -1,60 +1,233 @@
 # 🚀 Multi-Agent AI Automation
-### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker + CI/CD
+### Automated LinkedIn Post Generator using Google Gemini + Google Sheets + FastAPI + Docker + CI/CD
 
-This project implements a production-ready **multi-agent AI automation workflow** including:
-
-- 🤖 **Agent A (Writer)** — generates LinkedIn-style content  
-- 🧠 **Agent B (Editor)** — critiques and rewrites it in strict JSON  
-- 🌐 **FastAPI REST API** — exposes the workflow  
-- 📊 **Google Sheets logging**  
-- 🐳 **Docker containerization**  
-- 🔄 **CI/CD with GitHub Actions + Docker Hub push**
+This project implements a **production-grade multi-agent AI workflow** with:
+- 🤖 **Agent A — Writer** (generates LinkedIn post draft)
+- 🧠 **Agent B — Editor** (critiques and rewrites in strict JSON)
+- 🌐 **FastAPI REST API**
+- 📊 **Google Sheets logging**
+- 🐳 **Docker / Docker Compose**
+- 🔄 **CI/CD via GitHub Actions + Docker Hub**
+- 🛡 **Robust error handling** (detailed below)
 
 ---
 
 # ⭐ Features
 
 ### ✍️ Agent A — Writer  
-- Generates a clean, concise, buzzword-free LinkedIn draft  
-- Includes retry logic for empty Gemini responses  
-- Uses Google Gemini API (Flash model)
+- Generates clean, concrete, business-style drafts  
+- Avoids buzzwords, emojis, vague statements  
+- Retries automatically if Gemini returns empty/blocked content  
 
-### 📝 Agent B — Editor  
-- Strict editor persona  
-- Returns **valid JSON**, always:  
+### 🧠 Agent B — Editor  
+- Returns strict JSON:  
 ```json
 {
   "critique": "...",
   "final_post": "..."
 }
 ```
-- Automatically sanitizes malformed outputs  
-- Improves clarity, removes buzzwords, sharpens message  
+- Removes buzzwords, sharpens message  
+- Automatically fixes malformed JSON returned by Gemini  
+- Protects against unexpected editor output  
 
-### 📊 Google Sheets Logging  
-Each request logs:
-
-- Timestamp  
-- Topic  
-- Draft  
-- Final post  
-- Token usage  
-- Estimated cost
-
-### 🌐 REST API (FastAPI)
-Endpoint:
+### 🌐 FastAPI REST API  
+Main endpoint:
 
 ```
 POST /generate-post
 ```
 
-Example request:
+Request:
 ```json
-{ "topic": "The future of AI automation" }
+{ "topic": "Your topic here" }
 ```
 
-Swagger UI:  
-👉 http://localhost:8000/docs
+Response includes:
+- writer draft  
+- editor critique  
+- final edited post  
+- token usage  
+- cost  
+
+Docs: 👉 http://localhost:8000/docs
+
+### 📊 Google Sheets Logging  
+Every request is stored:
+- Timestamp  
+- Topic  
+- Draft  
+- Final post  
+- Tokens  
+- Cost  
+
+### 🐳 Docker Support  
+Run entire service in an isolated container.
+
+### 🔄 CI/CD  
+Automatic:
+- Tests  
+- Docker build  
+- Docker Hub push  
+
+---
+
+# 🛡 🛡 🛡 **ERROR HANDLING (FULL, DETAILED, PRODUCTION-GRADE)**
+
+The project includes **multi-layer error protection** to ensure reliability.
+
+---
+
+# 1️⃣ Gemini API Error Handling
+
+### ✔️ Case: Gemini returns empty response  
+Gemini sometimes returns 0 tokens (blocked content/safety flags).  
+Writer agent handles this with **retries + fallback**:
+
+```python
+for _ in range(3):
+    try:
+        text, usage, _ = generate_text(prompt)
+        if text.strip():
+            return {...}
+    except GeminiAPIError:
+        last_error = exc
+```
+
+After 3 failures:
+
+- fallback draft is returned  
+- execution **does not crash**  
+- error is logged  
+
+---
+
+### ✔️ Case: Gemini API connectivity failure
+
+Handled in `gemini_client.py`:
+
+```python
+except Exception as exc:
+    raise GeminiAPIError(f"Gemini API request failed: {exc}")
+```
+
+The rest of the app receives a controlled exception.
+
+---
+
+### ✔️ Case: response has no .text field  
+Gemini sometimes returns candidates without `.text`.  
+We reconstruct text manually:
+
+```python
+for cand in response.candidates:
+    for part in cand.content.parts:
+        if part.text:
+            parts.append(part.text)
+```
+
+If still empty → **error raised intentionally**:
+
+```python
+raise GeminiAPIError("Gemini returned an empty response.")
+```
+
+---
+
+# 2️⃣ Editor JSON Parsing Errors
+
+Gemini sometimes returns invalid JSON.
+
+Example of malformed model output:
+
+```
+{
+  "critique": "..."
+  "final_post": ...
+```
+
+Editor handles this via:
+
+```python
+try:
+    payload = json.loads(cleaned)
+except Exception:
+    critique = f"Failed to parse JSON from editor. Raw response: {cleaned}"
+```
+
+In worst-case:
+- critique explains the failure  
+- original draft is preserved  
+- service continues running  
+
+---
+
+# 3️⃣ Google Sheets Logging Errors
+
+If Google Sheets fails (e.g., invalid credentials, rate limits, API outage):
+
+```python
+except GoogleSheetsError as exc:
+    print("[WARNING] Failed to write data to Google Sheets.")
+```
+
+⚠️ Importantly:  
+**The post generation STILL succeeds.**  
+Sheets logging is optional—not critical.
+
+---
+
+# 4️⃣ FastAPI Error Handling
+
+### ✔️ Invalid request  
+Handled automatically by Pydantic → 422 Unprocessable Entity
+
+### ✔️ Gemini error  
+Returned as structured 500:
+
+```json
+{
+  "detail": "Gemini failed: <error>"
+}
+```
+
+### ✔️ Sheets error  
+Returned as 503:
+
+```json
+{
+  "detail": "Google Sheets is unavailable"
+}
+```
+
+The API never exposes raw tracebacks.
+
+---
+
+# 5️⃣ Docker Runtime Error Isolation
+
+Docker ensures:
+
+- environment consistency  
+- no dependency conflicts  
+- API always starts cleanly  
+- logs are isolated  
+
+If the container fails → systemd / Docker restart policies can be added.
+
+---
+
+# 6️⃣ CI/CD Error Handling
+
+GitHub Actions pipeline includes:
+
+- syntax check (compileall)
+- pip install validation
+- Docker registry authentication verification
+- safe repository name sanitization (`tr -d '[:space:]'`)
+- conditional push only on `main`
+
+Broken builds never reach production.
 
 ---
 
@@ -82,24 +255,23 @@ multi-agent-gemini/
 
 ---
 
-# 🔧 Local Installation
-
-Clone:
+# 🔧 Installation
 
 ```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
 ```
 
-Create virtual environment:
+Create venv:
 
 ```bash
 python -m venv venv
-source venv/bin/activate      # macOS / Linux
-venv\Scripts\activate       # Windows
+source venv/bin/activate
+# Windows:
+# venv\Scripts\activate
 ```
 
-Install dependencies:
+Install:
 
 ```bash
 pip install -r requirements.txt
@@ -109,138 +281,67 @@ pip install -r requirements.txt
 
 # 🔑 Environment Variables
 
-Create a `.env` file:
+Create `.env`:
 
 ```
-GEMINI_API_KEY=YOUR_GEMINI_KEY
+GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL_NAME=models/gemini-2.5-flash
 TOKEN_PRICE=0.000002
 
 GOOGLE_SHEETS_CREDENTIALS=credentials.json
-GOOGLE_SHEETS_ID=YOUR_GOOGLE_SHEET_ID
+GOOGLE_SHEETS_ID=YOUR_SHEET_ID
 ```
-
-Use `.env.example` as a template.
 
 ---
 
-# ▶️ Running Locally
-
-Run main script:
-
-```bash
-python main.py
-```
-
-Run API:
+# 🌐 Start API
 
 ```bash
 uvicorn api:app --reload
 ```
 
-Swagger docs:  
-👉 http://127.0.0.1:8000/docs
+Docs:  
+👉 http://localhost:8000/docs
 
 ---
 
-# 🐳 Docker Support
+# 🐳 Docker
 
-### Start container:
+Run:
 
 ```bash
 docker compose up -d --build
 ```
 
-### Stop:
+Stop:
 
 ```bash
 docker compose down
 ```
 
-API available at:  
-👉 http://localhost:8000
-
 ---
 
-# 🐳 Dockerfile Overview
+# 🔄 CI/CD
 
-- Python 3.11 slim  
-- Installs dependencies  
-- Runs FastAPI via Uvicorn  
-- Production-ready container  
+Pipeline file: `.github/workflows/ci-cd.yml`
 
----
-
-# 🔄 CI/CD (GitHub Actions + Docker Hub)
-
-Workflow file:  
-`.github/workflows/ci-cd.yml`
-
-Pipeline steps:
-
-1️⃣ Lint & compile Python code  
-2️⃣ Run tests (if any)  
-3️⃣ Build Docker image  
-4️⃣ Login to Docker Hub  
-5️⃣ Push `latest` tag  
-
-### Required GitHub Secrets 🎯
+Secrets required:
 
 | Secret | Value |
 |--------|--------|
 | `REGISTRY_USERNAME` | Docker Hub username |
-| `REGISTRY_PASSWORD` | Docker Hub Personal Access Token |
+| `REGISTRY_PASSWORD` | Docker Hub token |
 | `REGISTRY_REPOSITORY` | profy025/multi-agent-ai-automation |
 
-Trigger:  
-- Push to **main**  
-- Pull requests to **main**
+Workflow on push to `main`:
 
----
-
-# 📊 Google Sheets Setup
-
-1. Create a new Google Sheet  
-2. Add this header row:
-
-```
-Timestamp | Topic | Draft | Final Post | Total Tokens | Cost
-```
-
-3. Go to Google Cloud Console  
-4. Enable:
-   - Google Sheets API
-   - Google Drive API  
-5. Create a **Service Account**  
-6. Download `credentials.json`  
-7. Share your sheet with the service account email  
-
----
-
-# 🧩 Technology Stack
-
-- FastAPI  
-- Google Gemini API  
-- gspread  
-- OAuth2 Service Account  
-- Docker / Docker Compose  
-- GitHub Actions  
-- Python 3.11  
-
----
-
-# 🔮 Future Enhancements
-
-- Agent C (auto LinkedIn posting)  
-- Web UI Dashboard  
-- Kubernetes deployment  
-- Grafana monitoring  
-- Rate-limiter & caching  
-- OAuth2 authentication  
+- syntax check  
+- build docker image  
+- push to Docker Hub  
 
 ---
 
 # 👤 Author
 
 **Profy8712**  
-👉 https://github.com/Profy8712
+https://github.com/Profy8712
