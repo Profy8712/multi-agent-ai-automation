@@ -7,13 +7,13 @@
         "path": "multi-agent-linkedin-post",
         "options": {}
       },
-      "id": "d7cf2d11-34d0-41d3-ad45-f7cfc41a0878",
+      "id": "e351a99f-9115-4e33-acc6-9c78ced4846b",
       "name": "Webhook - Topic Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        -112,
-        -112
+        -2208,
+        224
       ],
       "webhookId": "multi-agent-linkedin-post-webhook"
     },
@@ -21,54 +21,56 @@
       "parameters": {
         "functionCode": "const topic = $json[\"topic\"] || \"The future of AI Agents in Business\";\n\nconst prompt = `You are a professional LinkedIn copywriter.\n\nWrite a short LinkedIn post based on the topic below.\n\nRequirements:\n- maximum 5 sentences\n- no emojis\n- no hashtags\n- avoid generic buzzwords\n- be specific and concrete\n- write in a natural, conversational tone\n\nTopic: \"${topic}\"`;\n\nreturn [{ json: { topic, prompt } }];"
       },
-      "id": "cf49eca6-fac6-4c32-ace2-6600503bbd2a",
+      "id": "9c1aff99-559e-4127-ba38-12a3ccec02ca",
       "name": "Function - Build Writer Prompt",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        192,
-        -112
+        -1904,
+        224
       ]
     },
     {
       "parameters": {
+        "requestMethod": "POST",
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
         "jsonParameters": true,
         "options": {}
       },
-      "id": "19ed93c9-b771-4001-88d0-02191f967e4c",
+      "id": "b561f211-9c53-4ad4-8f24-ad738f7a2894",
       "name": "HTTP - Gemini Writer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
       "position": [
-        496,
-        -112
-      ]
+        -1104,
+        -272
+      ],
+      "disabled": true
     },
     {
       "parameters": {
-        "functionCode": "const topic = $item(0).$node[\"Function - Build Writer Prompt\"].json.topic;\n\n// Gemini response structure may vary; this example assumes a candidates[0].content.parts[0].text-like output.\nconst res = $json;\nlet draft = \"\";\n\ntry {\n  const candidates = res.candidates || [];\n  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0].text) {\n    draft = candidates[0].content.parts[0].text.trim();\n  }\n} catch (e) {\n  draft = \"[ERROR] Could not parse writer response\";\n}\n\n// Optional token usage placeholder\nconst usage = res.usageMetadata || {};\n\nreturn [{ json: { topic, draft, writerUsage: usage } }];"
+        "functionCode": "// Get topic from \"Function - Build Writer Prompt\"\nconst topic =\n  $node[\"Function - Build Writer Prompt\"]?.json?.topic || \"\";\n\n// Get draft text from Gemini Writer response\nconst draft =\n  $json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || \"\";\n\n// Return for next nodes\nreturn [\n  {\n    json: {\n      topic,\n      draft,\n    },\n  },\n];\n"
       },
-      "id": "211168e4-bdcd-490e-8c4d-e0e7063b69ba",
+      "id": "3569a8a8-fbfa-4976-9b4b-9313100a6f6c",
       "name": "Function - Extract Writer Draft",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        800,
-        -112
+        -1328,
+        224
       ]
     },
     {
       "parameters": {
         "functionCode": "const topic = $json[\"topic\"];\nconst draft = $json[\"draft\"];\n\nconst prompt = `You are a strict editor. You hate generic buzzwords.\n\nYou will receive a LinkedIn post draft.\nYour tasks:\n1) Briefly critique the draft (maximum 3 sentences).\n2) Rewrite it to be sharper, more concrete, and more impactful.\n\nRESPONSE FORMAT (IMPORTANT):\n- Respond ONLY in valid JSON.\n- No additional text, no markdown, no explanations.\n- Use exactly these keys: \"critique\" and \"final_post\".\n\nExample:\n{\n  \"critique\": \"The draft is too vague and uses generic language...\",\n  \"final_post\": \"Here is the revised, punchier version...\"\n}\n\nDRAFT:\n\"\"\"${draft}\"\"\"`;\n\nreturn [{ json: { topic, draft, prompt, writerUsage: $json.writerUsage } }];"
       },
-      "id": "49332bba-0d42-48be-9eff-56efb2b33df0",
+      "id": "1e651d46-8c27-4ec8-8cec-66312ee2f0f9",
       "name": "Function - Build Editor Prompt",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        1088,
-        -112
+        -992,
+        224
       ]
     },
     {
@@ -77,39 +79,40 @@
         "jsonParameters": true,
         "options": {}
       },
-      "id": "80c4dfa1-fc51-4a08-8be5-775af5180d33",
+      "id": "19a3c2f3-1976-484b-bd8e-b20107fac1db",
       "name": "HTTP - Gemini Editor",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
       "position": [
-        1392,
-        -112
-      ]
+        -800,
+        -272
+      ],
+      "disabled": true
     },
     {
       "parameters": {
         "functionCode": "const topic = $item(0).$node[\"Function - Build Editor Prompt\"].json.topic;\nconst draft = $item(0).$node[\"Function - Build Editor Prompt\"].json.draft;\nconst writerUsage = $item(0).$node[\"Function - Build Editor Prompt\"].json.writerUsage || {};\n\nconst res = $json;\nlet rawText = \"\";\n\ntry {\n  const candidates = res.candidates || [];\n  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0].text) {\n    rawText = candidates[0].content.parts[0].text.trim();\n  }\n} catch (e) {\n  rawText = \"[ERROR] Could not parse editor response\";\n}\n\n// Clean markdown fences\nlet cleaned = rawText.trim();\nif (cleaned.startsWith(\"```\")) {\n  const firstNewline = cleaned.indexOf(\"\\n\");\n  if (firstNewline !== -1) cleaned = cleaned.slice(firstNewline + 1);\n  if (cleaned.endsWith(\"```\")) cleaned = cleaned.slice(0, -3);\n}\n\nlet critique = \"\";\nlet finalPost = draft;\n\ntry {\n  const parsed = JSON.parse(cleaned);\n  critique = (parsed.critique || \"\").trim();\n  finalPost = (parsed.final_post || draft).trim();\n} catch (e) {\n  critique = `Failed to parse JSON from editor. Raw: ${cleaned}`;\n}\n\nconst editorUsage = res.usageMetadata || {};\n\nreturn [{\n  json: {\n    topic,\n    draft,\n    final_post: finalPost,\n    critique,\n    writerUsage,\n    editorUsage,\n    rawEditorOutput: rawText\n  }\n}];"
       },
-      "id": "859e63fb-a4b5-49c7-99fc-923f49d37578",
+      "id": "bee51b9c-4f07-4e1e-bfb7-9d946096dcba",
       "name": "Function - Parse Editor JSON",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        1696,
-        -112
+        -448,
+        224
       ]
     },
     {
       "parameters": {
-        "functionCode": "const TOKEN_PRICE = parseFloat($env.TOKEN_PRICE || \"0.000002\");\n\nconst writerUsage = $json.writerUsage || {};\nconst editorUsage = $json.editorUsage || {};\n\nconst writerTokens = writerUsage.totalTokenCount || writerUsage.total_tokens || 0;\nconst editorTokens = editorUsage.totalTokenCount || editorUsage.total_tokens || 0;\n\nconst totalTokens = Number(writerTokens) + Number(editorTokens);\nconst cost = totalTokens * TOKEN_PRICE;\n\nreturn [{\n  json: {\n    topic: $json.topic,\n    draft: $json.draft,\n    final_post: $json.final_post,\n    critique: $json.critique,\n    totalTokens,\n    cost\n  }\n}];"
+        "functionCode": "// Get main fields from previous node\nconst topic      = $json.topic      || \"\";\nconst draft      = $json.draft      || \"\";\nconst final_post = $json.final_post || \"\";\n\n// usage objects added from Parse Editor JSON\nconst w = $json.writerUsage || {};\nconst e = $json.editorUsage || {};\n\n// INPUT TOKENS — always promptTokenCount\nconst writer_input_tokens  = w.promptTokenCount || 0;\nconst editor_input_tokens  = e.promptTokenCount || 0;\n\n// OUTPUT TOKENS — take totalTokenCount - promptTokenCount\n// because candidatesTokenCount is NOT always present in Gemini API responses\nconst writer_output_tokens = (w.totalTokenCount || 0) - (w.promptTokenCount || 0);\nconst editor_output_tokens = (e.totalTokenCount || 0) - (e.promptTokenCount || 0);\n\n// totals\nconst input_tokens  = writer_input_tokens + editor_input_tokens;\nconst output_tokens = writer_output_tokens + editor_output_tokens;\nconst total_tokens  = input_tokens + output_tokens;\n\n// Prices per 1000 tokens (example)\nconst WRITER_IN_PRICE  = 0.00035;\nconst WRITER_OUT_PRICE = 0.00070;\nconst EDITOR_IN_PRICE  = 0.00350;\nconst EDITOR_OUT_PRICE = 0.01050;\n\n// Cost calculation\nconst writer_cost =\n  (writer_input_tokens  / 1000) * WRITER_IN_PRICE +\n  (writer_output_tokens / 1000) * WRITER_OUT_PRICE;\n\nconst editor_cost =\n  (editor_input_tokens  / 1000) * EDITOR_IN_PRICE +\n  (editor_output_tokens / 1000) * EDITOR_OUT_PRICE;\n\nconst estimated_cost = writer_cost + editor_cost;\n\n// Return results\nreturn [\n  {\n    json: {\n      topic,\n      draft,\n      final_post,\n\n      writer_input_tokens,\n      writer_output_tokens,\n\n      editor_input_tokens,\n      editor_output_tokens,\n\n      input_tokens,\n      output_tokens,\n      total_tokens,\n      estimated_cost,\n    },\n  },\n];\n"
       },
-      "id": "dba6a2ca-7c13-4e19-8fba-c6489fb93837",
+      "id": "45891f03-a5a4-4001-ae2a-c97197b0d6d9",
       "name": "Function - Tokens & Cost",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        2000,
-        -112
+        -176,
+        224
       ]
     },
     {
@@ -130,44 +133,112 @@
           "fieldValues": [
             {
               "fieldId": "Timestamp",
-              "fieldValue": "={{$json.timestamp}}"
+              "fieldValue": "={{ $now }}\n"
             },
             {
               "fieldId": "Topic",
-              "fieldValue": "={{$json.topic}}"
+              "fieldValue": "={{$json[\"topic\"]}}"
             },
             {
               "fieldId": "Draft (Writer)",
-              "fieldValue": "={{$json.writerDraft}}"
+              "fieldValue": "={{$json[\"draft\"]}}"
             },
             {
               "fieldId": "Final Post (Editor)",
-              "fieldValue": "={{$json.finalPost}}"
+              "fieldValue": "={{$json[\"final_post\"]}}"
             },
             {
               "fieldId": "Total Tokens",
-              "fieldValue": "={{$json.totalTokens}}"
+              "fieldValue": "={{$json[\"total_tokens\"]}}"
             },
             {
               "fieldId": "Cost",
-              "fieldValue": "={{$json.cost}}"
+              "fieldValue": "={{$json[\"estimated_cost\"]}}"
             }
           ]
         },
         "options": {}
       },
-      "id": "379add55-13b3-4c0a-8e87-2fed3ade3d9c",
+      "id": "6b303281-9dbd-475f-995a-1bf80bab4620",
       "name": "Google Sheets - Append Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 3,
       "position": [
-        2288,
-        -112
+        112,
+        224
       ],
       "credentials": {
         "googleApi": {
           "id": "D8shoEE5oppYqdrp",
           "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{$json[\"prompt\"]}}\n\n"
+            }
+          ]
+        },
+        "simplify": false,
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        224
+      ],
+      "id": "5f7dfa60-c940-4352-a086-239e40ea2ec9",
+      "name": "Gemini Editor",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LwrRSIXik8h7JIKV",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=\n\n{{$json[\"prompt\"]}}\n"
+            }
+          ]
+        },
+        "simplify": false,
+        "jsonOutput": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        224
+      ],
+      "id": "432db266-0954-4d02-8fde-57083510b348",
+      "name": "Gemini Writer",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LwrRSIXik8h7JIKV",
+          "name": "Google Gemini(PaLM) Api account 2"
         }
       }
     }
@@ -189,7 +260,7 @@
       "main": [
         [
           {
-            "node": "HTTP - Gemini Writer",
+            "node": "Gemini Writer",
             "type": "main",
             "index": 0
           }
@@ -198,13 +269,7 @@
     },
     "HTTP - Gemini Writer": {
       "main": [
-        [
-          {
-            "node": "Function - Extract Writer Draft",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Function - Extract Writer Draft": {
@@ -222,7 +287,7 @@
       "main": [
         [
           {
-            "node": "HTTP - Gemini Editor",
+            "node": "Gemini Editor",
             "type": "main",
             "index": 0
           }
@@ -231,13 +296,7 @@
     },
     "HTTP - Gemini Editor": {
       "main": [
-        [
-          {
-            "node": "Function - Parse Editor JSON",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Function - Parse Editor JSON": {
@@ -261,17 +320,39 @@
           }
         ]
       ]
+    },
+    "Gemini Writer": {
+      "main": [
+        [
+          {
+            "node": "Function - Extract Writer Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Editor": {
+      "main": [
+        [
+          {
+            "node": "Function - Parse Editor JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "88509e54-f4ef-49cc-a657-65f82d52c71c",
+  "versionId": "ae3b96ff-ef66-4849-aff2-a335fe049960",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "b7fe7a08be045ab891c44405d92121634711663ce0be46d4908fc6f3655bf1fc"
   },
-  "id": "BSWhDaOCvUoWOIqk",
+  "id": "BjV3fGgFa0knHDYq",
   "tags": []
 }
