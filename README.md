@@ -1,75 +1,122 @@
 # 🚀 Multi-Agent AI Automation
 ### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker + n8n
 
-This project provides a **production-grade multi-agent automation system** integrating:
+This repository contains a **production-grade multi-agent automation system** built to solve the **Technical Test Task: Multi-Agent AI Automation** and expanded into a full-scale, professional automation project.
 
-- **Google Gemini AI** (Writer Agent + Editor Agent)  
-- **Google Sheets logging**
-- **FastAPI REST API**
+The solution integrates:
+
+- **Google Gemini AI** (Writer Agent + Editor Agent)
+- **n8n workflow automation**
+- **Google Sheets logging (via Service Account)**
+- **FastAPI REST microservice**
 - **Docker containerization**
-- **GitHub Actions CI/CD**
-- **n8n workflow automation (Webhook → AI → Sheets)**
+- **GitHub Actions CI/CD pipeline**
 
-All components together form an end‑to‑end automated content generation pipeline.
+It demonstrates real-world automation skills: AI orchestration, error handling, structured output validation, token & cost analytics, persistent logging, and deployment readiness.
 
 ---
 
-# ⭐ Features
+# 🔥 Technical Test Solution Summary
 
-## ✍️ Agent A — Writer  
-Generates a LinkedIn-style draft based on a topic.  
-Characteristics:
-- No buzzwords
+## 🎯 Objective
+Build a workflow where:
+1. **Agent A (Writer)** generates a LinkedIn-style draft.  
+2. **Agent B (Editor)** critiques & rewrites it in a punchier tone.  
+3. System logs results + tokens + cost to Google Sheets.  
+4. Workflow triggered via Webhook.
+
+---
+
+# 🧩 Workflow Summary (n8n)
+
+### Steps:
+1. Webhook Trigger  
+2. Gemini Writer  
+3. Gemini Editor  
+4. JSON Validation  
+5. Token & Cost Calculation  
+6. Google Sheets Append  
+7. JSON Response
+
+Writer rules:
 - No emojis / hashtags  
+- No buzzwords  
 - Max 5 sentences  
-- Natural, professional tone  
-- Retry logic for empty Gemini responses  
-- Robust error handling  
 
----
-
-## 📝 Agent B — Editor  
-A strict editor persona that:
-- Critiques the draft (max 3 sentences)
-- Rewrites it in a stronger, punchier tone
-- ALWAYS returns **valid JSON**:
+Editor rules:
+- Strict editor persona  
+- Critique (max 3 sentences)  
+- Rewritten final post  
+- Must output JSON:
 ```json
-{
-  "critique": "...",
-  "final_post": "..."
-}
+{"critique":"...","final_post":"..."}
 ```
 
-The system automatically:
-- Cleans malformed JSON  
-- Removes backticks, markdown fences  
-- Ensures structured output  
+---
+
+# 📊 Token & Cost Calculation
+
+Gemini provides:
+- `promptTokenCount`
+- `totalTokenCount`
+
+Output tokens = `totalTokenCount - promptTokenCount`.
+
+Pricing model included:
+- Writer: $0.00035 input / $0.00070 output
+- Editor: $0.00350 input / $0.01050 output
+
+System automatically logs:
+- Writer input/output
+- Editor input/output
+- Total tokens
+- Estimated cost
 
 ---
 
-## 📊 Google Sheets Logging  
-Every processed request is saved with:
+# 🛡 Error Handling
 
+### Includes:
+- Empty Writer response → retry  
+- Malformed JSON → repair  
+- Hallucinated structure → cleanup  
+- Too-long draft → trimming  
+- Sheets write errors → safe handling  
+- Missing topic → immediate error  
+
+---
+
+# 🚀 Extended Project Features
+
+## ✍️ Agent A – Writer
+- Short, clear LinkedIn drafts  
+- Business tone  
+- Retry logic  
+- Safe defaults  
+
+## 📝 Agent B – Editor
+- Strong rewriting  
+- JSON-only output  
+- Automatic JSON cleanup  
+
+## 📊 Google Sheets Logging
+Logs:
 - Timestamp  
 - Topic  
 - Writer Draft  
-- Editor Final Post  
-- Total Tokens  
-- Estimated Cost  
-
-Google Sheets is accessed via a **Google Service Account**.
+- Final Post  
+- Tokens  
+- Cost  
 
 ---
 
-## 🌐 REST API (FastAPI)
+# 🌐 FastAPI REST API
 
-Main endpoint:
-
-### `POST /generate-post`
+### POST /generate-post
 
 Input:
 ```json
-{ "topic": "Your topic here" }
+{"topic":"Your topic"}
 ```
 
 Output:
@@ -83,91 +130,66 @@ Output:
 }
 ```
 
-Interactive API docs:  
-👉 http://localhost:8000/docs
+Docs: http://localhost:8000/docs
 
 ---
 
-## 🐳 Docker Support
-
-Build and run the service in background:
+# 🐳 Docker Support
 
 ```bash
 docker compose up -d --build
-```
-
-Stop:
-```bash
 docker compose down
 ```
 
-API will be available at:
-👉 http://localhost:8000
+---
+
+# 🔄 n8n Workflow File
+
+```
+n8n_multi_agent_workflow.json
+```
+
+Import in n8n:
+- Workflows → Import → Upload
 
 ---
 
-## 🔄 n8n Workflow Automation
+# ⚙️ CI/CD – GitHub Actions
 
-A complete workflow is included:
+Includes:
+- Python install & lint  
+- Docker image build  
+- Docker Hub push  
+- Production build verification  
+- Optional deploy trigger  
 
-**File:**  
+Secrets:
 ```
-/n8n_multi_agent_workflow.json
-```
-
-### Workflow steps:
-1. Webhook trigger  
-2. Agent A — Writer call  
-3. Agent B — Editor call  
-4. Error-handling path (JSON check, retries)  
-5. Google Sheets append  
-6. Respond with final JSON  
-
-### Import instructions:
-
-1. Open **n8n**
-2. Go to **Workflows → Import**
-3. Upload:  
-   ```
-   n8n_multi_agent_workflow.json
-   ```
-4. Configure credentials:
-   - Gemini API Key
-   - Google Sheets Service Account
-5. Activate workflow
-
-### Webhook usage:
-You will get a link like:
-
-```
-POST https://n8n.your-domain.com/webhook/ai-post-generator
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+GEMINI_API_KEY
+GOOGLE_SHEETS_ID
+SERVICE_ACCOUNT_JSON
 ```
 
-Body:
-```json
-{ "topic": "The future of AI Agents in Business" }
+Workflow file:
+```
+.github/workflows/ci-cd.yml
 ```
 
 ---
 
-# 📂 Project Structure
+# 📁 Project Structure
 
 ```
 multi_agent_gemini/
-│
 ├── agents/
-│   ├── writer_agent.py
-│   ├── editor_agent.py
-│
 ├── utils/
-│   ├── gemini_client.py
-│   ├── google_sheets.py
-│
 ├── api.py
 ├── main.py
+├── n8n_multi_agent_workflow.json
 ├── Dockerfile
 ├── docker-compose.yml
-├── n8n_multi_agent_workflow.json
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -177,24 +199,14 @@ multi_agent_gemini/
 
 # 🔧 Installation
 
-Clone repo:
-
 ```bash
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
-```
 
-Create env:
-
-```bash
 python -m venv venv
-source venv/bin/activate      # macOS / Linux
-venv\Scripts\activate       # Windows
-```
+source venv/bin/activate  # Linux/macOS
+venv\Scripts\activate   # Windows
 
-Install dependencies:
-
-```bash
 pip install -r requirements.txt
 ```
 
@@ -202,96 +214,13 @@ pip install -r requirements.txt
 
 # 🔑 Environment Variables
 
-Create a `.env`:
-
 ```
 GEMINI_API_KEY=YOUR_KEY
 GEMINI_MODEL_NAME=models/gemini-2.5-flash
-TOKEN_PRICE=0.000002
 
 GOOGLE_SHEETS_CREDENTIALS=credentials.json
 GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID
 ```
-
----
-
-# ▶️ Run from CLI
-
-```bash
-python main.py
-```
-
----
-
-# 🌐 Run API server
-
-```bash
-uvicorn api:app --reload
-```
-
-Docs: http://127.0.0.1:8000/docs
-
----
-
-# ⚙️ CI/CD – GitHub Actions
-
-The project includes a production-ready pipeline:
-
-### ✔️ On push to `main`:
-- Install Python  
-- Lint & syntax check  
-- Build Docker image  
-- Push image to Docker Hub  
-- Validate workflow  
-
-Config file:  
-```
-.github/workflows/ci-cd.yml
-```
-
-### Required GitHub secrets:
-
-| Secret | Purpose |
-|--------|---------|
-| `DOCKERHUB_USERNAME` | Docker Hub login |
-| `DOCKERHUB_TOKEN` | Access token |
-| `GOOGLE_SHEETS_ID` | Spreadsheet |
-| `GEMINI_API_KEY` | Gemini auth |
-
----
-
-# 🧩 Error Handling
-
-### Gemini client handles:
-- Empty responses  
-- Blocked responses  
-- Missing parts  
-- JSON parse errors  
-- Auto‑retry logic  
-
-### API layer handles:
-- Missing topic field  
-- Upstream AI errors  
-- Sheets write failures  
-- HTTP 500 wrapping  
-
-### n8n workflow handles:
-- JSON validation  
-- Retry on Gemini call  
-- Fallback response  
-- Structured logging  
-
----
-
-# 🛠️ Technologies
-- Python 3.11  
-- FastAPI  
-- Google Gemini API  
-- gspread  
-- Uvicorn  
-- Docker + Docker Compose  
-- GitHub Actions  
-- n8n workflow engine  
 
 ---
 
