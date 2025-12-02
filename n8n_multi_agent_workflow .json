@@ -7,13 +7,13 @@
         "path": "multi-agent-linkedin-post",
         "options": {}
       },
-      "id": "e351a99f-9115-4e33-acc6-9c78ced4846b",
+      "id": "9e8ff9a6-1bed-4498-befa-1a9b9cba5b77",
       "name": "Webhook - Topic Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        -2208,
-        224
+        -1104,
+        496
       ],
       "webhookId": "multi-agent-linkedin-post-webhook"
     },
@@ -21,98 +21,65 @@
       "parameters": {
         "functionCode": "const topic = $json[\"topic\"] || \"The future of AI Agents in Business\";\n\nconst prompt = `You are a professional LinkedIn copywriter.\n\nWrite a short LinkedIn post based on the topic below.\n\nRequirements:\n- maximum 5 sentences\n- no emojis\n- no hashtags\n- avoid generic buzzwords\n- be specific and concrete\n- write in a natural, conversational tone\n\nTopic: \"${topic}\"`;\n\nreturn [{ json: { topic, prompt } }];"
       },
-      "id": "9c1aff99-559e-4127-ba38-12a3ccec02ca",
+      "id": "59a10f2f-233b-474f-9c6c-ebce1c216e4c",
       "name": "Function - Build Writer Prompt",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -1904,
-        224
+        -800,
+        496
       ]
-    },
-    {
-      "parameters": {
-        "requestMethod": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-        "jsonParameters": true,
-        "options": {}
-      },
-      "id": "b561f211-9c53-4ad4-8f24-ad738f7a2894",
-      "name": "HTTP - Gemini Writer",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
-      "position": [
-        -1104,
-        -272
-      ],
-      "disabled": true
     },
     {
       "parameters": {
         "functionCode": "// Get topic from \"Function - Build Writer Prompt\"\nconst topic =\n  $node[\"Function - Build Writer Prompt\"]?.json?.topic || \"\";\n\n// Get draft text from Gemini Writer response\nconst draft =\n  $json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || \"\";\n\n// Return for next nodes\nreturn [\n  {\n    json: {\n      topic,\n      draft,\n    },\n  },\n];\n"
       },
-      "id": "3569a8a8-fbfa-4976-9b4b-9313100a6f6c",
+      "id": "592fd24d-f77c-48c7-8d5f-8687075845d0",
       "name": "Function - Extract Writer Draft",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -1328,
-        224
+        -224,
+        496
       ]
     },
     {
       "parameters": {
         "functionCode": "const topic = $json[\"topic\"];\nconst draft = $json[\"draft\"];\n\nconst prompt = `You are a strict editor. You hate generic buzzwords.\n\nYou will receive a LinkedIn post draft.\nYour tasks:\n1) Briefly critique the draft (maximum 3 sentences).\n2) Rewrite it to be sharper, more concrete, and more impactful.\n\nRESPONSE FORMAT (IMPORTANT):\n- Respond ONLY in valid JSON.\n- No additional text, no markdown, no explanations.\n- Use exactly these keys: \"critique\" and \"final_post\".\n\nExample:\n{\n  \"critique\": \"The draft is too vague and uses generic language...\",\n  \"final_post\": \"Here is the revised, punchier version...\"\n}\n\nDRAFT:\n\"\"\"${draft}\"\"\"`;\n\nreturn [{ json: { topic, draft, prompt, writerUsage: $json.writerUsage } }];"
       },
-      "id": "1e651d46-8c27-4ec8-8cec-66312ee2f0f9",
+      "id": "354b2135-f2d7-44e4-833c-130abd14ebd6",
       "name": "Function - Build Editor Prompt",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -992,
-        224
+        112,
+        496
       ]
-    },
-    {
-      "parameters": {
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
-        "jsonParameters": true,
-        "options": {}
-      },
-      "id": "19a3c2f3-1976-484b-bd8e-b20107fac1db",
-      "name": "HTTP - Gemini Editor",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
-      "position": [
-        -800,
-        -272
-      ],
-      "disabled": true
     },
     {
       "parameters": {
         "functionCode": "const topic = $item(0).$node[\"Function - Build Editor Prompt\"].json.topic;\nconst draft = $item(0).$node[\"Function - Build Editor Prompt\"].json.draft;\nconst writerUsage = $item(0).$node[\"Function - Build Editor Prompt\"].json.writerUsage || {};\n\nconst res = $json;\nlet rawText = \"\";\n\ntry {\n  const candidates = res.candidates || [];\n  if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts && candidates[0].content.parts[0].text) {\n    rawText = candidates[0].content.parts[0].text.trim();\n  }\n} catch (e) {\n  rawText = \"[ERROR] Could not parse editor response\";\n}\n\n// Clean markdown fences\nlet cleaned = rawText.trim();\nif (cleaned.startsWith(\"```\")) {\n  const firstNewline = cleaned.indexOf(\"\\n\");\n  if (firstNewline !== -1) cleaned = cleaned.slice(firstNewline + 1);\n  if (cleaned.endsWith(\"```\")) cleaned = cleaned.slice(0, -3);\n}\n\nlet critique = \"\";\nlet finalPost = draft;\n\ntry {\n  const parsed = JSON.parse(cleaned);\n  critique = (parsed.critique || \"\").trim();\n  finalPost = (parsed.final_post || draft).trim();\n} catch (e) {\n  critique = `Failed to parse JSON from editor. Raw: ${cleaned}`;\n}\n\nconst editorUsage = res.usageMetadata || {};\n\nreturn [{\n  json: {\n    topic,\n    draft,\n    final_post: finalPost,\n    critique,\n    writerUsage,\n    editorUsage,\n    rawEditorOutput: rawText\n  }\n}];"
       },
-      "id": "bee51b9c-4f07-4e1e-bfb7-9d946096dcba",
+      "id": "ff6d0ea4-55f0-4add-b75d-6109ac8c6c62",
       "name": "Function - Parse Editor JSON",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -448,
-        224
+        656,
+        496
       ]
     },
     {
       "parameters": {
         "functionCode": "// Get main fields from previous node\nconst topic      = $json.topic      || \"\";\nconst draft      = $json.draft      || \"\";\nconst final_post = $json.final_post || \"\";\n\n// usage objects added from Parse Editor JSON\nconst w = $json.writerUsage || {};\nconst e = $json.editorUsage || {};\n\n// INPUT TOKENS — always promptTokenCount\nconst writer_input_tokens  = w.promptTokenCount || 0;\nconst editor_input_tokens  = e.promptTokenCount || 0;\n\n// OUTPUT TOKENS — take totalTokenCount - promptTokenCount\n// because candidatesTokenCount is NOT always present in Gemini API responses\nconst writer_output_tokens = (w.totalTokenCount || 0) - (w.promptTokenCount || 0);\nconst editor_output_tokens = (e.totalTokenCount || 0) - (e.promptTokenCount || 0);\n\n// totals\nconst input_tokens  = writer_input_tokens + editor_input_tokens;\nconst output_tokens = writer_output_tokens + editor_output_tokens;\nconst total_tokens  = input_tokens + output_tokens;\n\n// Prices per 1000 tokens (example)\nconst WRITER_IN_PRICE  = 0.00035;\nconst WRITER_OUT_PRICE = 0.00070;\nconst EDITOR_IN_PRICE  = 0.00350;\nconst EDITOR_OUT_PRICE = 0.01050;\n\n// Cost calculation\nconst writer_cost =\n  (writer_input_tokens  / 1000) * WRITER_IN_PRICE +\n  (writer_output_tokens / 1000) * WRITER_OUT_PRICE;\n\nconst editor_cost =\n  (editor_input_tokens  / 1000) * EDITOR_IN_PRICE +\n  (editor_output_tokens / 1000) * EDITOR_OUT_PRICE;\n\nconst estimated_cost = writer_cost + editor_cost;\n\n// Return results\nreturn [\n  {\n    json: {\n      topic,\n      draft,\n      final_post,\n\n      writer_input_tokens,\n      writer_output_tokens,\n\n      editor_input_tokens,\n      editor_output_tokens,\n\n      input_tokens,\n      output_tokens,\n      total_tokens,\n      estimated_cost,\n    },\n  },\n];\n"
       },
-      "id": "45891f03-a5a4-4001-ae2a-c97197b0d6d9",
+      "id": "bfe46237-7aef-4200-9dc0-6ee0d6067de5",
       "name": "Function - Tokens & Cost",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
       "position": [
-        -176,
-        224
+        928,
+        496
       ]
     },
     {
@@ -159,13 +126,13 @@
         },
         "options": {}
       },
-      "id": "6b303281-9dbd-475f-995a-1bf80bab4620",
+      "id": "1a562292-260a-4f49-b20c-4cf38b196292",
       "name": "Google Sheets - Append Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 3,
       "position": [
-        112,
-        224
+        1216,
+        496
       ],
       "credentials": {
         "googleApi": {
@@ -196,10 +163,10 @@
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1,
       "position": [
-        -768,
-        224
+        336,
+        496
       ],
-      "id": "5f7dfa60-c940-4352-a086-239e40ea2ec9",
+      "id": "f669c2ea-6286-4721-937c-1daa926f7dde",
       "name": "Gemini Editor",
       "credentials": {
         "googlePalmApi": {
@@ -230,10 +197,10 @@
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1,
       "position": [
-        -1728,
-        224
+        -624,
+        496
       ],
-      "id": "432db266-0954-4d02-8fde-57083510b348",
+      "id": "14563645-ce6e-4d04-926a-094d3232c31a",
       "name": "Gemini Writer",
       "credentials": {
         "googlePalmApi": {
@@ -267,11 +234,6 @@
         ]
       ]
     },
-    "HTTP - Gemini Writer": {
-      "main": [
-        []
-      ]
-    },
     "Function - Extract Writer Draft": {
       "main": [
         [
@@ -292,11 +254,6 @@
             "index": 0
           }
         ]
-      ]
-    },
-    "HTTP - Gemini Editor": {
-      "main": [
-        []
       ]
     },
     "Function - Parse Editor JSON": {
@@ -344,15 +301,14 @@
       ]
     }
   },
-  "active": true,
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "ae3b96ff-ef66-4849-aff2-a335fe049960",
+  "versionId": "fd5dc797-8e64-4fdb-853b-58109d112d6c",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "b7fe7a08be045ab891c44405d92121634711663ce0be46d4908fc6f3655bf1fc"
   },
-  "id": "BjV3fGgFa0knHDYq",
+  "id": "ATDJJSQ00zdik5ro",
   "tags": []
 }
