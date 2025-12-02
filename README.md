@@ -1,33 +1,28 @@
 # 🚀 Multi-Agent AI Automation
 ### Automated LinkedIn Post Generation using Google Gemini + Google Sheets + FastAPI + Docker + n8n
 
-This repository contains a **production-grade multi-agent automation system** built to solve the **Technical Test Task: Multi-Agent AI Automation** and expanded into a full-scale, professional automation project.
+This repository contains a production-grade multi-agent automation system built to solve the Technical Test Task: Multi-Agent AI Automation and expanded into a full-scale, professional automation project.
 
 The solution integrates:
-
-- **Google Gemini AI** (Writer Agent + Editor Agent)
-- **n8n workflow automation**
-- **Google Sheets logging (via Service Account)**
-- **FastAPI REST microservice**
-- **Docker containerization**
-- **GitHub Actions CI/CD pipeline**
+- Google Gemini AI (Writer Agent + Editor Agent)
+- n8n workflow automation
+- Google Sheets logging (via Service Account)
+- FastAPI REST microservice
+- Docker containerization
+- GitHub Actions CI/CD pipeline
 
 It demonstrates real-world automation skills: AI orchestration, error handling, structured output validation, token & cost analytics, persistent logging, and deployment readiness.
 
----
+## 🔥 Technical Test Solution Summary
 
-# 🔥 Technical Test Solution Summary
-
-## 🎯 Objective
+### 🎯 Objective
 Build a workflow where:
-1. **Agent A (Writer)** generates a LinkedIn-style draft.  
-2. **Agent B (Editor)** critiques & rewrites it in a punchier tone.  
-3. System logs results + tokens + cost to Google Sheets.  
+1. Agent A (Writer) generates a LinkedIn-style draft.
+2. Agent B (Editor) critiques & rewrites it in a punchier tone.
+3. System logs results + tokens + cost to Google Sheets.
 4. Workflow triggered via Webhook.
 
----
-
-# 🧩 Workflow Summary (n8n)
+## 🧩 Workflow Summary (n8n)
 
 ### Steps:
 1. Webhook Trigger  
@@ -48,79 +43,68 @@ Editor rules:
 - Critique (max 3 sentences)  
 - Rewritten final post  
 - Must output JSON:
-```json
 {"critique":"...","final_post":"..."}
-```
 
----
+## 📘 Technical Test Instructions (Included in README)
 
-# 📊 Token & Cost Calculation
+### 📌 1. Summary of the Task
+- Webhook receives: { "topic": "..." }
+- Agent A writes the LinkedIn draft.
+- Agent B critiques the draft and returns JSON.
+- Workflow stores all results in Google Sheets.
 
-Gemini provides:
-- `promptTokenCount`
-- `totalTokenCount`
+### 📌 2. How to Import the Workflow in n8n
+1. Open n8n
+2. Go to Workflows → Import
+3. Upload: n8n_multi_agent_workflow.json
+4. Configure credentials:
+   - Gemini API Key
+   - Google Sheets (Service Account)
+5. Activate workflow
 
-Output tokens = `totalTokenCount - promptTokenCount`.
+### 📌 3. How to Test the Workflow
+Run workflow in test mode:
 
-Pricing model included:
-- Writer: $0.00035 input / $0.00070 output
-- Editor: $0.00350 input / $0.01050 output
+curl -X POST 'https://your-workspace.n8n.cloud/webhook-test/multi-agent-linkedin-post' \
+  -H 'Content-Type: application/json' \
+  -d '{"topic": "The future of AI Agents in Business"}'
 
-System automatically logs:
-- Writer input/output
-- Editor input/output
-- Total tokens
-- Estimated cost
+Check:
+- Writer output  
+- Editor JSON  
+- Token calculation  
+- Google Sheets row
 
----
+### 📌 4. Token Usage & Cost Calculation
+Gemini fields:
+- promptTokenCount  
+- totalTokenCount  
 
-# 🛡 Error Handling
+Output tokens = totalTokenCount - promptTokenCount
 
-### Includes:
+Pricing example:
+- Writer: $0.00035 input / $0.00070 output  
+- Editor: $0.00350 input / $0.01050 output  
+
+Cost formula:
+(tokens_input/1000 × price_input) + (tokens_output/1000 × price_output)
+
+## 🛡 Error Handling
 - Empty Writer response → retry  
-- Malformed JSON → repair  
-- Hallucinated structure → cleanup  
-- Too-long draft → trimming  
-- Sheets write errors → safe handling  
-- Missing topic → immediate error  
+- Malformed JSON → cleanup  
+- Oversized drafts → trimming  
+- Sheets write failure → fallback  
+- Missing topic → stop workflow  
 
----
+## 🌐 FastAPI REST API
 
-# 🚀 Extended Project Features
-
-## ✍️ Agent A – Writer
-- Short, clear LinkedIn drafts  
-- Business tone  
-- Retry logic  
-- Safe defaults  
-
-## 📝 Agent B – Editor
-- Strong rewriting  
-- JSON-only output  
-- Automatic JSON cleanup  
-
-## 📊 Google Sheets Logging
-Logs:
-- Timestamp  
-- Topic  
-- Writer Draft  
-- Final Post  
-- Tokens  
-- Cost  
-
----
-
-# 🌐 FastAPI REST API
-
-### POST /generate-post
+Endpoint:
+POST /generate-post
 
 Input:
-```json
 {"topic":"Your topic"}
-```
 
 Output:
-```json
 {
   "draft": "...",
   "critique": "...",
@@ -128,60 +112,33 @@ Output:
   "tokens": 123,
   "cost": 0.000246
 }
-```
 
-Docs: http://localhost:8000/docs
+Docs:
+http://localhost:8000/docs
 
----
+## 🐳 Docker Support
+docker compose up -d --build  
+docker compose down  
 
-# 🐳 Docker Support
+## 🔄 n8n Workflow File
+File: n8n_multi_agent_workflow.json  
+Import through n8n → Workflows → Import  
 
-```bash
-docker compose up -d --build
-docker compose down
-```
-
----
-
-# 🔄 n8n Workflow File
-
-```
-n8n_multi_agent_workflow.json
-```
-
-Import in n8n:
-- Workflows → Import → Upload
-
----
-
-# ⚙️ CI/CD – GitHub Actions
-
+## ⚙️ CI/CD – GitHub Actions
 Includes:
-- Python install & lint  
-- Docker image build  
-- Docker Hub push  
-- Production build verification  
-- Optional deploy trigger  
+- Python validation  
+- Docker build  
+- Push to Docker Hub  
+- Deploy trigger  
 
 Secrets:
-```
-DOCKERHUB_USERNAME
-DOCKERHUB_TOKEN
-GEMINI_API_KEY
-GOOGLE_SHEETS_ID
-SERVICE_ACCOUNT_JSON
-```
+DOCKERHUB_USERNAME  
+DOCKERHUB_TOKEN  
+GEMINI_API_KEY  
+GOOGLE_SHEETS_ID  
+SERVICE_ACCOUNT_JSON  
 
-Workflow file:
-```
-.github/workflows/ci-cd.yml
-```
-
----
-
-# 📁 Project Structure
-
-```
+## 📁 Project Structure
 multi_agent_gemini/
 ├── agents/
 ├── utils/
@@ -193,37 +150,21 @@ multi_agent_gemini/
 ├── requirements.txt
 ├── .env.example
 └── README.md
-```
 
----
-
-# 🔧 Installation
-
-```bash
+## 🔧 Installation
 git clone https://github.com/Profy8712/multi-agent-ai-automation.git
 cd multi-agent-ai-automation
 
 python -m venv venv
-source venv/bin/activate  # Linux/macOS
-venv\Scripts\activate   # Windows
-
+source venv/bin/activate
 pip install -r requirements.txt
-```
 
----
+## 🔑 Environment Variables
+GEMINI_API_KEY=YOUR_KEY  
+GEMINI_MODEL_NAME=models/gemini-2.5-flash  
+GOOGLE_SHEETS_CREDENTIALS=credentials.json  
+GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID  
 
-# 🔑 Environment Variables
-
-```
-GEMINI_API_KEY=YOUR_KEY
-GEMINI_MODEL_NAME=models/gemini-2.5-flash
-
-GOOGLE_SHEETS_CREDENTIALS=credentials.json
-GOOGLE_SHEETS_ID=YOUR_SPREADSHEET_ID
-```
-
----
-
-# 👤 Author
-**Profy8712**  
+## 👤 Author
+Profy8712  
 https://github.com/Profy8712
